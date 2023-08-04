@@ -1,0 +1,14 @@
+build
+migrations
+node_modules
+.env
+*.DS_Store
+.tsbuilt
+yarn-error.log
+.build
+.npmignore
+LendingVaultV1FactoryFlattened.sol
+LendingVaultV1Flattened.sol
+LendingVaultWatcher01Flattened.sol
+LVDeployerFlattened.sol
+notes.txt
