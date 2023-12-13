@@ -20,7 +20,7 @@ const oneMantissa = (new BN(10)).pow(new BN(18));
 const TEST_AMOUNT = bnMantissa(100);
 const MAX_UINT_256 = (new BN(2)).pow(new BN(256)).sub(new BN(1));
 const RESERVE_FACTOR_TEST = bnMantissa(0.15);
-const RESERVE_FACTOR_MAX = bnMantissa(0.5);
+const RESERVE_FACTOR_MAX = bnMantissa(0.9);
 
 function slightlyIncrease(bn) {
 	return bn.mul( bnMantissa(1.0001) ).div( oneMantissa );
@@ -34,6 +34,7 @@ contract('LVSetter', function (accounts) {
 	let root = accounts[0];
 	let user = accounts[1];
 	let admin = accounts[2];
+	let robber = accounts[3];
 	let vault;
 	let borrowable0;
 	let borrowable1;
@@ -72,7 +73,7 @@ contract('LVSetter', function (accounts) {
 			expectEqual(await vault.reserveFactor(), RESERVE_FACTOR_TEST);
 		});
 
-		it('reserve factory boundaries', async () => {
+		it('reserve factor boundaries', async () => {
 			const succeedMin = BN(0);
 			const succeedMax = slightlyDecrease(RESERVE_FACTOR_MAX);
 			const failMax = slightlyIncrease(RESERVE_FACTOR_MAX);
@@ -233,11 +234,11 @@ contract('LVSetter', function (accounts) {
 		it('unwind borrowable 0 liquid', async () => {
 			await vault.disableBorrowable(borrowable0.address, {from: admin});
 			// exchangeRate must be 1
-			const redeemAmount = await borrowable0.balanceOf(vault.address);
-			const actualRedeemAmount = redeemAmount;
-			expectEqual(redeemAmount, oneMantissa.mul(BN(100)));
+			const underlyingBalance = await borrowable0.balanceOf(vault.address);
+			const actualRedeemAmount = underlyingBalance;
+			expectEqual(underlyingBalance, oneMantissa.mul(BN(100)));
 			const receipt = await vault.unwindBorrowable(borrowable0.address, {from: admin});
-			expectEvent(receipt, 'UnwindBorrowable', {borrowable: borrowable0.address, redeemAmount, actualRedeemAmount});
+			expectEvent(receipt, 'UnwindBorrowable', {borrowable: borrowable0.address, underlyingBalance, actualRedeemAmount});
 			expectEqual(await borrowable0.balanceOf(vault.address), BN(0));
 			await expectRevert(
 				vault.unwindBorrowable(borrowable0.address, {from: admin}), 
@@ -249,14 +250,14 @@ contract('LVSetter', function (accounts) {
 			await vault.enableBorrowable(borrowable0.address, {from: admin});
 			await vault.reallocate();
 			// exchangeRate must be 1
-			const lockedAmount = (await borrowable0.balanceOf(vault.address)).div(BN(2));
-			const redeemAmount = (await borrowable0.balanceOf(vault.address)).div(BN(2));
-			const actualRedeemAmount = redeemAmount;
-			expectEqual(redeemAmount, oneMantissa.mul(BN(100)));
+			const underlyingBalance = await borrowable0.balanceOf(vault.address);
+			const lockedAmount = underlyingBalance.div(BN(2));
+			const actualRedeemAmount = underlyingBalance.sub(lockedAmount);
+			expectEqual(actualRedeemAmount, oneMantissa.mul(BN(100)));
 			await borrowable0.simulateBorrowBurningTokens(lockedAmount);
 			await vault.disableBorrowable(borrowable0.address, {from: admin});
 			const receipt = await vault.unwindBorrowable(borrowable0.address, {from: admin});
-			expectEvent(receipt, 'UnwindBorrowable', {borrowable: borrowable0.address, redeemAmount, actualRedeemAmount});
+			expectEvent(receipt, 'UnwindBorrowable', {borrowable: borrowable0.address, underlyingBalance, actualRedeemAmount});
 			expectEqual(await borrowable0.balanceOf(vault.address), lockedAmount);
 		});
 
@@ -267,6 +268,14 @@ contract('LVSetter', function (accounts) {
 			await vault.unwindBorrowable(borrowable0.address, {from: admin});
 			expectEqual(await borrowable0.balanceOf(vault.address), BN(0));
 			await vault.removeBorrowable(borrowable0.address, {from: admin});
+		});
+
+		it('after unwind the balance cant be stolen', async () => {
+			const initialVaultBalance = await vault.obj.token.balanceOf(vault.address);
+			await vault.skim(robber);
+			const vaultBalance = await vault.obj.token.balanceOf(vault.address);
+			expectEqual(initialVaultBalance, vaultBalance);
+			await expectRevert(vault.mint(robber), "LendingVaultV1: MINT_AMOUNT_ZERO");
 		});
 	});
 	
@@ -280,8 +289,6 @@ contract('LVSetter', function (accounts) {
 			await vault.obj.token.transfer(vault.address, AMOUNT, {from: user});
 			await vault.mint(user);
 			await borrowable0.simulateBorrow(AMOUNT.mul(BN(3)));
-			//console.log(await borrowable0.exchangeRate.call() / 1e18);
-			//expectAlmostEqualMantissa(await borrowable0.exchangeRate.call(), BN(200258752).mul(BN(100000000000)));
 		});
 
 		it('unwind to zero - amount * 1e18 % exchangeRate == 0', async () => {
@@ -324,6 +331,7 @@ contract('LVSetter', function (accounts) {
 			const availableAmount = await vault.obj.token.balanceOf(borrowable0.address);
 			const redeemTokens = availableAmount.mul(oneMantissa).div(exchangeRate);
 			const redeemTokens2 = redeemTokens.add(BN(1));
+			const initialTokens = await borrowable0.balanceOf(vault.address);
 			//console.log(availableAmount.mul(oneMantissa).mod(exchangeRate) * 1);
 			//console.log(availableAmount.toString());
 			//console.log(redeemTokens.mul(exchangeRate).div(oneMantissa).toString());
@@ -333,6 +341,7 @@ contract('LVSetter', function (accounts) {
 			assert.ok(redeemTokens2.mul(exchangeRate).div(oneMantissa).gt(availableAmount), "Not greater than availableAmount");
 			await vault.disableBorrowable(borrowable0.address, {from: admin});
 			await vault.unwindBorrowable(borrowable0.address, {from: admin});
+			expectEqual(await borrowable0.balanceOf(vault.address), initialTokens.sub(redeemTokens));
 			assert.ok((await vault.obj.token.balanceOf(borrowable0.address)).gt(BN(0)), "Final balance is 0");
 		});
 	});

@@ -28,16 +28,16 @@ contract LendingVaultV1Harness is LendingVaultV1 {
 		uint ownedSupply,
 		uint totalSupply,
 		uint utilizationRate,
-		uint kinkAPR,
-		uint cachedSupplyAPR
+		uint kinkRate,
+		uint cachedSupplyRate
 	) {
 		externalSupply = borrowable.externalSupply;
 		initialOwnedSupply = borrowable.initialOwnedSupply;
 		ownedSupply = borrowable.ownedSupply;
 		totalSupply = borrowable.totalSupply();
 		utilizationRate = borrowable.utilizationRate();
-		kinkAPR = borrowable.kinkAPR();
-		cachedSupplyAPR = borrowable.cachedSupplyAPR;
+		kinkRate = borrowable.kinkRate();
+		cachedSupplyRate = borrowable.cachedSupplyRate;
 	}
 	
 	function getBorrowableInfo(address borrowable) external returns (
@@ -46,24 +46,24 @@ contract LendingVaultV1Harness is LendingVaultV1 {
 		uint ownedSupply,
 		uint totalSupply,
 		uint utilizationRate,
-		uint kinkAPR,
-		uint cachedSupplyAPR
+		uint kinkRate,
+		uint cachedSupplyRate
 	) {
-		BorrowableObject.Borrowable memory borrowableObj = BorrowableObject.newBorrowable(IBorrowable(borrowable));
+		BorrowableObject.Borrowable memory borrowableObj = BorrowableObject.newBorrowable(IBorrowable(borrowable), address(this));
 		(
 			externalSupply,
 			initialOwnedSupply,
 			ownedSupply,
 			totalSupply,
 			utilizationRate,
-			kinkAPR,
-			cachedSupplyAPR
+			kinkRate,
+			cachedSupplyRate
 		) = _getBorrowableInfo(borrowableObj);
 	}
 	
-	function getAmountForAPR(address borrowable, uint APR) external returns (uint amount) {
-		BorrowableObject.Borrowable memory borrowableObj = BorrowableObject.newBorrowable(IBorrowable(borrowable));
-		return borrowableObj.calculateAmountForAPR(APR);
+	function getAmountForRate(address borrowable, uint Rate) external returns (uint amount) {
+		BorrowableObject.Borrowable memory borrowableObj = BorrowableObject.newBorrowable(IBorrowable(borrowable), address(this));
+		return borrowableObj.calculateAmountForRate(Rate);
 	}
 	
 	function testAllocate(address borrowable, uint amount) external returns (
@@ -72,10 +72,10 @@ contract LendingVaultV1Harness is LendingVaultV1 {
 		uint ownedSupply,
 		uint totalSupply,
 		uint utilizationRate,
-		uint kinkAPR,
-		uint cachedSupplyAPR
+		uint kinkRate,
+		uint cachedSupplyRate
 	) {
-		BorrowableObject.Borrowable memory borrowableObj = BorrowableObject.newBorrowable(IBorrowable(borrowable));
+		BorrowableObject.Borrowable memory borrowableObj = BorrowableObject.newBorrowable(IBorrowable(borrowable), address(this));
 		borrowableObj = borrowableObj.allocate(amount);
 		(
 			externalSupply,
@@ -83,8 +83,8 @@ contract LendingVaultV1Harness is LendingVaultV1 {
 			ownedSupply,
 			totalSupply,
 			utilizationRate,
-			kinkAPR,
-			cachedSupplyAPR
+			kinkRate,
+			cachedSupplyRate
 		) = _getBorrowableInfo(borrowableObj);
 	}
 	
@@ -94,10 +94,10 @@ contract LendingVaultV1Harness is LendingVaultV1 {
 		uint ownedSupply,
 		uint totalSupply,
 		uint utilizationRate,
-		uint kinkAPR,
-		uint cachedSupplyAPR
+		uint kinkRate,
+		uint cachedSupplyRate
 	) {
-		BorrowableObject.Borrowable memory borrowableObj = BorrowableObject.newBorrowable(IBorrowable(borrowable));
+		BorrowableObject.Borrowable memory borrowableObj = BorrowableObject.newBorrowable(IBorrowable(borrowable), address(this));
 		borrowableObj = borrowableObj.deallocate(amount);
 		(
 			externalSupply,
@@ -105,8 +105,8 @@ contract LendingVaultV1Harness is LendingVaultV1 {
 			ownedSupply,
 			totalSupply,
 			utilizationRate,
-			kinkAPR,
-			cachedSupplyAPR
+			kinkRate,
+			cachedSupplyRate
 		) = _getBorrowableInfo(borrowableObj);
 	}
 	
@@ -116,11 +116,11 @@ contract LendingVaultV1Harness is LendingVaultV1 {
 		uint ownedSupply,
 		uint totalSupply,
 		uint utilizationRate,
-		uint kinkAPR,
-		uint cachedSupplyAPR,
+		uint kinkRate,
+		uint cachedSupplyRate,
 		uint amount
 	) {
-		BorrowableObject.Borrowable memory borrowableObj = BorrowableObject.newBorrowable(IBorrowable(borrowable));
+		BorrowableObject.Borrowable memory borrowableObj = BorrowableObject.newBorrowable(IBorrowable(borrowable), address(this));
 		(borrowableObj, amount) = borrowableObj.deallocateMax();
 		(
 			externalSupply,
@@ -128,8 +128,8 @@ contract LendingVaultV1Harness is LendingVaultV1 {
 			ownedSupply,
 			totalSupply,
 			utilizationRate,
-			kinkAPR,
-			cachedSupplyAPR
+			kinkRate,
+			cachedSupplyRate
 		) = _getBorrowableInfo(borrowableObj);
 	}
 

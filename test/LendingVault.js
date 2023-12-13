@@ -2,7 +2,8 @@ const {
 	makeErc20Token,
 	makeBorrowable,
 	makeBorrowables,
-	LendingVaultV1Factory,
+	makeFactory,
+	makeLendingVaultWatcher,
 	LendingVaultV1,
 } = require('./Utils/Impermax');
 const {
@@ -28,14 +29,23 @@ function slightlyIncrease(bn) {
 function slightlyDecrease(bn) {
 	return bn.mul( oneMantissa ).div( bnMantissa(1.00001) );
 }
+async function setBorrowablesTimestamp(borrowables, time) {
+	for(let i = 0; i < borrowables.length; i++) {
+		await borrowables[i].setBlockTimestamp(time);
+	}
+}
 async function printSnapshot(vault, borrowables) {
-	/*const exchangeRate = await vault.exchangeRate.call() / 1e18;
+	//return;
+	const exchangeRate = await vault.exchangeRate.call() / 1e18;
 	const totalSupply = await vault.totalSupply() / 1e18;
 	const underlyingBalance = totalSupply * exchangeRate;
+	const vaultDust = await borrowables[0].obj.token.balanceOf(vault.address) / 1e18;
 	console.log("Vault data");
 	console.log("exchangeRate", exchangeRate);
 	console.log("calculated underlyingBalance", underlyingBalance);
+	console.log("vault dust", vaultDust);
 	console.log();
+	//return;
 	for (let i = 0; i < borrowables.length; i++) {
 		await borrowables[i].sync();
 		const exchangeRate = await borrowables[i].exchangeRate.call() / 1e18;
@@ -58,7 +68,7 @@ async function printSnapshot(vault, borrowables) {
 		console.log("supplyAPR", supplyAPR);
 		console.log();
 	}
-	console.log();*/
+	console.log();
 }
 
 //TODO add expect
@@ -73,16 +83,16 @@ contract('LendingVaultV1', function (accounts) {
 	let reservesAdmin = accounts[6];	
 	let reallocateManager = accounts[7];
 
-	describe('main', () => {
+	/*describe('preliminarary test', () => {
 		let token;
 		
-		it(`preliminarary test`, async () => {
+		it(`test`, async () => {
 			token = await makeErc20Token();
 			const borrowable1 = await makeBorrowable({token});
 			const borrowable2 = await makeBorrowable({token});
 			const borrowable3 = await makeBorrowable({token});
 			const borrowable4 = await makeBorrowable({token});
-			const factory = await LendingVaultV1Factory.new(admin, reservesAdmin);
+			const factory = await makeFactory({admin, reservesAdmin});
 			//await factory._setReallocateManager(reallocateManager, {from: admin});
 			const vaultAddress = await factory.createVault.call(token.address, "", "");
 			await factory.createVault(token.address, "", "");
@@ -153,15 +163,27 @@ contract('LendingVaultV1', function (accounts) {
 			console.log("balanceBorrowable3", await borrowable3.balanceOf(vault.address) * 1);
 			console.log("balanceBorrowable4", await borrowable4.balanceOf(vault.address) * 1);
 		});
+	
+	});*/
+	
+
+	describe('test first scenario, reallocate and APRs convergence', () => {
+		let token;
+		let borrowables;
+		let factory;
+		let vaultAddress;
+		let vault;
+		let lendingVaultWatcher;
 		
 		it(`test first scenario, reallocate and APRs convergence`, async () => {
 			token = await makeErc20Token();
-			const borrowables = await makeBorrowables(token, 6);
-			const factory = await LendingVaultV1Factory.new(admin, reservesAdmin);
+			borrowables = await makeBorrowables(token, 6);
+			factory = await makeFactory({admin, reservesAdmin});
 			//await factory._setReallocateManager(reallocateManager, {from: admin});
-			const vaultAddress = await factory.createVault.call(token.address, "", "");
+			vaultAddress = await factory.createVault.call(token.address, "", "");
 			await factory.createVault(token.address, "", "");
-			const vault = await LendingVaultV1.at(vaultAddress);
+			vault = await LendingVaultV1.at(vaultAddress);
+			lendingVaultWatcher = await makeLendingVaultWatcher();
 			
 			// initialize
 			for(let i = 0; i < borrowables.length; i++) {
@@ -189,17 +211,13 @@ contract('LendingVaultV1', function (accounts) {
 			await printSnapshot(vault, borrowables);
 			
 			// wait some time
-			for(let i = 0; i < borrowables.length; i++) {
-				await borrowables[i].setBlockTimestamp(3600 * 24 * 5);
-			}
+			await setBorrowablesTimestamp(borrowables, 3600 * 24 * 5);
 			console.log("AFTER 5 DAYS");
 			await printSnapshot(vault, borrowables);
 			
 			// increase APR of borrowable 4
 			await borrowables[4].simulateBorrow(oneMantissa.mul(BN(600)));
-			for(let i = 0; i < borrowables.length; i++) {
-				await borrowables[i].setBlockTimestamp(3600 * 24 * 10);
-			}
+			await setBorrowablesTimestamp(borrowables, 3600 * 24 * 10);
 			console.log("AFTER 10 DAYS");
 			await printSnapshot(vault, borrowables);
 			await vault.reallocate({from: reallocateManager});
@@ -208,42 +226,32 @@ contract('LendingVaultV1', function (accounts) {
 			
 			// increase APR of borrowable 1
 			await borrowables[1].simulateBorrow(oneMantissa.mul(BN(1500)));
-			for(let i = 0; i < borrowables.length; i++) {
-				await borrowables[i].setBlockTimestamp(3600 * 24 * 13);
-			}
+			await setBorrowablesTimestamp(borrowables, 3600 * 24 * 13);
 			console.log("AFTER 13 DAYS");
 			await printSnapshot(vault, borrowables);
 			await vault.reallocate({from: reallocateManager});
 			console.log("AFTER REALLOCATE");
 			await printSnapshot(vault, borrowables);
 			
-			for(let i = 0; i < borrowables.length; i++) {
-				await borrowables[i].setBlockTimestamp(3600 * 24 * 16);
-			}
+			await setBorrowablesTimestamp(borrowables, 3600 * 24 * 16);
 			await token.mint(user, oneMantissa.mul(BN(600)));
 			await token.transfer(vault.address, oneMantissa.mul(BN(600)), {from: user});
 			await vault.mint(user);
 			console.log("AFTER 16 DAYS AND MINT");
 			await printSnapshot(vault, borrowables);
 			
-			for(let i = 0; i < borrowables.length; i++) {
-				await borrowables[i].setBlockTimestamp(3600 * 24 * 19);
-			}
+			await setBorrowablesTimestamp(borrowables, 3600 * 24 * 19);
 			await vault.reallocate({from: reallocateManager});
 			console.log("AFTER 19 DAYS AND REALLOCATE");
 			await printSnapshot(vault, borrowables);
 			
-			for(let i = 0; i < borrowables.length; i++) {
-				await borrowables[i].setBlockTimestamp(3600 * 24 * 22);
-			}
+			await setBorrowablesTimestamp(borrowables, 3600 * 24 * 22);
 			await vault.reallocate({from: reallocateManager});
 			console.log("AFTER 22 DAYS AND REALLOCATE");
 			await printSnapshot(vault, borrowables);
 			
 			// redeem
-			for(let i = 0; i < borrowables.length; i++) {
-				await borrowables[i].setBlockTimestamp(3600 * 24 * 24);
-			}
+			await setBorrowablesTimestamp(borrowables, 3600 * 24 * 24);
 			await vault.transfer(vault.address, oneMantissa.mul(BN(900)), {from: user});
 			await vault.redeem(user);
 			console.log("user balance:", await token.balanceOf(user) / 1e18); 
@@ -256,15 +264,86 @@ contract('LendingVaultV1', function (accounts) {
 			await vault.redeem(user);
 			console.log("AFTER BORROW AND REDEEM WITH LOCKED LIQUIDITY");
 			await printSnapshot(vault, borrowables);
+		});
+		
+		it(`make the exchangeRate grow to test with high number`, async () => {
 			
+			await setBorrowablesTimestamp(borrowables, 3600 * 24 * 40);
+			await vault.reallocate({from: reallocateManager});
+			console.log("40 DAYS");
+			await printSnapshot(vault, borrowables);
+			
+			await setBorrowablesTimestamp(borrowables, 3600 * 24 * 60);
+			await vault.reallocate({from: reallocateManager});
+			console.log("60 DAYS");
+			await printSnapshot(vault, borrowables);
+			
+			await setBorrowablesTimestamp(borrowables, 3600 * 24 * 100);
+			await vault.reallocate({from: reallocateManager});
+			console.log("100 DAYS");
+			await printSnapshot(vault, borrowables);
+			
+			await setBorrowablesTimestamp(borrowables, 3600 * 24 * 200);
+			await vault.reallocate({from: reallocateManager});
+			console.log("200 DAYS");
+			await printSnapshot(vault, borrowables);
+			
+			await setBorrowablesTimestamp(borrowables, 3600 * 24 * 400);
+			await vault.reallocate({from: reallocateManager});
+			console.log("400 DAYS");
+			await printSnapshot(vault, borrowables);
+			
+			await vault.transfer(vault.address, bnMantissa(0.0001), {from: user});
+			await vault.redeem(user);
+			console.log("REDEEM");
+			await printSnapshot(vault, borrowables);
+			
+			await setBorrowablesTimestamp(borrowables, 3600 * 24 * 405);
+			await token.mint(user, oneMantissa.mul(BN(200000)));
+			await token.transfer(vault.address, oneMantissa.mul(BN(200000)), {from: user});
+			await vault.mint(user);
+			console.log("405 DAYS MINT");
+			await printSnapshot(vault, borrowables);
+			
+			await setBorrowablesTimestamp(borrowables, 3600 * 24 * 410);
+			await token.mint(user, oneMantissa.mul(BN(1000000)));
+			await token.transfer(vault.address, oneMantissa.mul(BN(1000000)), {from: user});
+			await vault.mint(user);
+			console.log("410 DAYS MINT");
+			await printSnapshot(vault, borrowables);
+			
+			await setBorrowablesTimestamp(borrowables, 3600 * 24 * 415);
+			await borrowables[4].simulateBorrowBurningTokens(oneMantissa.mul(BN(200000)));
+			await vault.transfer(vault.address, oneMantissa.mul(BN(50)), {from: user});
+			await vault.redeem(user);
+			console.log("415 DAYS BORROW AND REDEEM");
+			await printSnapshot(vault, borrowables);
+			
+			const availableLiquidity = await lendingVaultWatcher.getAvailableLiquidity.call(vault.address);
+			const exchangeRate = await vault.exchangeRate.call();
+			const availableTokens = availableLiquidity.mul(oneMantissa).div(exchangeRate);
+			console.log("availableLiquidity", availableLiquidity / 1e18);
+			await vault.transfer(vault.address, availableTokens, {from: user});
+			await vault.redeem(user);
+			console.log("REDEEM ALL AVAILABLE LIQUIDITY");
+			await printSnapshot(vault, borrowables);
+		});
+		
+		it(`revert with insufficient liquidity`, async () => {
 			await vault.transfer(vault.address, oneMantissa.mul(BN(100)), {from: user});
 			await expectRevert(vault.redeem(user), 'LendingVaultV1: INSUFFICIENT_LIQUIDITY');
 		});
+	
+	});
+	
+
+	/*describe('test unwinding', () => {
+		let token;
 		
 		it(`test unwinding`, async () => {
 			token = await makeErc20Token();
 			const borrowables = await makeBorrowables(token, 4);
-			const factory = await LendingVaultV1Factory.new(admin, reservesAdmin);
+			const factory = await makeFactory({admin, reservesAdmin});
 			//await factory._setReallocateManager(reallocateManager, {from: admin});
 			const vaultAddress = await factory.createVault.call(token.address, "", "");
 			await factory.createVault(token.address, "", "");
@@ -282,9 +361,7 @@ contract('LendingVaultV1', function (accounts) {
 			await printSnapshot(vault, borrowables);
 			
 			// disable and unwind
-			for(let i = 0; i < borrowables.length; i++) {
-				await borrowables[i].setBlockTimestamp(3600 * 24 * 3);
-			}
+			await setBorrowablesTimestamp(borrowables, 3600 * 24 * 3);
 			await vault.disableBorrowable(borrowables[1].address, {from: admin});
 			await vault.unwindBorrowable(borrowables[1].address, {from: admin});
 			console.log("AFTER UNWIND");
@@ -307,5 +384,5 @@ contract('LendingVaultV1', function (accounts) {
 			console.log("AFTER REALLOCATE");
 			await printSnapshot(vault, borrowables);
 		});
-	});	
+	});*/
 });

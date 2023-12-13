@@ -64,6 +64,10 @@ contract BorrowableHarness is Borrowable {
 		reserveFactor = _reserveFactor;
 	}
 	
+	function setAdjustSpeed(uint _adjustSpeed) public {
+		adjustSpeed = _adjustSpeed;
+	}
+	
 	uint32 _blockTimestamp;
 	function getBlockTimestamp() public view returns (uint32) {
 		return _blockTimestamp;
@@ -99,8 +103,13 @@ contract BorrowableHarness is Borrowable {
 		totalBorrows = safe112(totalBorrows + borrowAmount);
 	}
 	
+	function simulateRepay(uint repayAmount) public accrue update {
+		uint tokensToBurn = repayAmount * 1e18 / exchangeRate();
+		totalSupply = totalSupply.sub(tokensToBurn);
+		totalBorrows = safe112(uint(totalBorrows).sub(repayAmount));
+	}
+	
 	function simulateBorrowBurningTokens(uint borrowAmount) public accrue update {
-		//_safeTransfer(address(0), borrowAmount);
 		IERC20(underlying).transfer(address(0), borrowAmount);
 		totalBorrows = safe112(totalBorrows + borrowAmount);
 	}
