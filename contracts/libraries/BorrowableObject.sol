@@ -5,7 +5,6 @@ import "./SafeMath.sol";
 import "./Math.sol";
 import "../interfaces/IBorrowable.sol";
 
-// TODO: IN GENERALE DEVO CONTROLLARE TUTTA LA MATEMATIC PER CONVERSIONE TOKEN AMOUNT E IN GENERALE CHECKARE CHE NON CI SIANO ERRORI CHE POSSANO SALTARE FUORI IN CASISTICHE PARTICOLARI (PER QUANTO RIGUARDA ALGORITMO REALLOCATE)
 
 library BorrowableObject {
 	using SafeMath for uint;
@@ -66,16 +65,16 @@ library BorrowableObject {
 
 	function supplyRate(Borrowable memory borrowable) internal pure returns (uint rate) {
 		uint utilizationRate_ = utilizationRate(borrowable);
+		uint ratio = utilizationRate_.mul(1e18).div(borrowable.kinkUtilizationRate);
+		uint borrowFactor; //borrowRate to kinkBorrowRate ratio
 		if (utilizationRate_ < borrowable.kinkUtilizationRate) {
-			uint ratio = utilizationRate_.mul(1e18).div(borrowable.kinkUtilizationRate);
-			rate = ratio.mul(ratio).div(1e18).mul(kinkRate(borrowable)).div(1e18);
+			borrowFactor = ratio;
 		} else {
-			rate = utilizationRate_.sub(borrowable.kinkUtilizationRate)
-				.mul(1e18).div(uint(1e18).sub(borrowable.kinkUtilizationRate))
-				.mul(borrowable.kinkMultiplier.sub(1))
-				.add(1e18)
-				.mul(kinkRate(borrowable)).div(1e18);
+			uint excessRatio = utilizationRate_.sub(borrowable.kinkUtilizationRate)
+				.mul(1e18).div(uint(1e18).sub(borrowable.kinkUtilizationRate));
+			borrowFactor = excessRatio.mul(borrowable.kinkMultiplier.sub(1)).add(1e18);
 		}
+		rate = borrowFactor.mul(kinkRate(borrowable)).div(1e18).mul(ratio).div(1e18);
 	}
 
 	function allocate(Borrowable memory borrowable, uint amount) internal pure returns (Borrowable memory) {
@@ -85,34 +84,42 @@ library BorrowableObject {
 	}
 
 	function deallocate(Borrowable memory borrowable, uint amount) internal pure returns (Borrowable memory) {
+		uint availableLiquidity = totalSupply(borrowable).sub(borrowable.totalBorrows, "ERROR: NEGATIVE AVAILABLE LIQUIDITY");
+		require(amount <= availableLiquidity, "ERROR: DEALLOCATE AMOUNT > AVAILABLE LIQUIDITY");
 		borrowable.ownedSupply = borrowable.ownedSupply.sub(amount);
 		borrowable.cachedSupplyRate = supplyRate(borrowable);
 		return borrowable;
 	}
 
 	function deallocateMax(Borrowable memory borrowable) internal pure returns (Borrowable memory, uint) {
-		uint amount = borrowable.externalSupply >= borrowable.totalBorrows
-			? borrowable.ownedSupply
-			: totalSupply(borrowable).sub(borrowable.totalBorrows); // TODO CAPIRE COSA SUCCEDE ESATTAMENTE IN QUESTO CALCOLO
+		if (totalSupply(borrowable) < borrowable.totalBorrows) return (borrowable, 0);
+		uint availableLiquidity = totalSupply(borrowable).sub(borrowable.totalBorrows);
+		uint amount = Math.min(borrowable.ownedSupply, availableLiquidity);
 		return (deallocate(borrowable, amount), amount);
 	}
 
-	function calculateAmountForRate(Borrowable memory borrowable, uint rate) internal pure returns (uint) {
-		require(rate > 0, "ERROR: rate = 0");
-		require(rate <= borrowable.cachedSupplyRate, "ERROR: TARGET rate > CACHED rate");
-		uint targetUtilizationRate;
+	function calculateUtilizationForRate(Borrowable memory borrowable, uint rate) internal pure returns (uint targetUtilizationRate) {
 		if (rate <= kinkRate(borrowable)) {
 			targetUtilizationRate = Math.sqrt(
 				rate.mul(1e18).div(kinkRate(borrowable)).mul(1e18)
 			).mul(borrowable.kinkUtilizationRate).div(1e18);
 		} else {
-			uint tmp = rate.mul(1e18).div(kinkRate(borrowable))
-				.sub(1e18)
-				.mul(uint(1e18).sub(borrowable.kinkUtilizationRate)).div(1e18);
-			targetUtilizationRate = tmp
-				.div(borrowable.kinkMultiplier.sub(1))
-				.add(borrowable.kinkUtilizationRate);
+			uint a = borrowable.kinkMultiplier.sub(1);
+			uint b = borrowable.kinkUtilizationRate.mul(borrowable.kinkMultiplier).sub(1e18);
+			uint c = rate.mul(borrowable.kinkUtilizationRate).div(1e18)
+				.mul(uint(1e18).sub(borrowable.kinkUtilizationRate)).div(kinkRate(borrowable));
+			uint tmp = Math.sqrt(
+				b.mul(b).div(1e18).add(a.mul(c).mul(4)).mul(1e18)
+			);
+			targetUtilizationRate = tmp.add(b).div(a).div(2);
 		}
+		require(targetUtilizationRate <= 1e18, "ERROR: TARGET UTILIZATION > 100%");
+	}
+
+	function calculateAmountForRate(Borrowable memory borrowable, uint rate) internal pure returns (uint) {
+		require(rate > 0, "ERROR: rate = 0");
+		require(rate <= borrowable.cachedSupplyRate, "ERROR: TARGET RATE > CACHED RATE");
+		uint targetUtilizationRate = calculateUtilizationForRate(borrowable, rate);
 		require(targetUtilizationRate <= utilizationRate(borrowable), "ERROR: TARGET UTILIZATION > CURRENT UTILIZATION");
 		uint targetSupply = borrowable.totalBorrows.mul(1e18).div(targetUtilizationRate);
 		return targetSupply.sub(totalSupply(borrowable), "ERROR: TARGET SUPPLY > TOTAL SUPPLY");

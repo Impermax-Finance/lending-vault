@@ -47,7 +47,7 @@ interface ILendingVaultV1 {
 	event RemoveBorrowable(address indexed borrowable);
 	event EnableBorrowable(address indexed borrowable);
 	event DisableBorrowable(address indexed borrowable);
-	event UnwindBorrowable(address indexed borrowable, uint256 redeemAmount, uint256 actualRedeemAmount);
+	event UnwindBorrowable(address indexed borrowable, uint256 underlyingBalance, uint256 actualRedeemAmount);
 	event AllocateIntoBorrowable(address indexed borrowable, uint256 mintAmount, uint256 mintTokens);
 	event DeallocateFromBorrowable(address indexed borrowable, uint256 redeemAmount, uint256 redeemTokens);
 

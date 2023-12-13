@@ -5,7 +5,6 @@ import "./interfaces/ILendingVaultV1Factory.sol";
 
 contract LendingVaultV1 is LVSetterV1 {
 
-	// TODO QUESTO PU0' ESSERE OTTIMIZZATO PORTANDOSI DIETRO BORROWABLE OBJECT
 	function _getTotalSupplied() internal returns (uint totalSupplied) {
 		for (uint i = 0; i < borrowables.length; i++) {
 			address borrowable = borrowables[i];
@@ -47,7 +46,7 @@ contract LendingVaultV1 is LVSetterV1 {
 			mintTokens = mintTokens.sub(MINIMUM_LIQUIDITY);
 			_mint(address(0), MINIMUM_LIQUIDITY);
 		}
-		require(mintTokens > 0, "Impermax: MINT_AMOUNT_ZERO");
+		require(mintTokens > 0, "LendingVaultV1: MINT_AMOUNT_ZERO");
 		_mint(minter, mintTokens);
 		_withdrawAndReallocate(0);
 		emit Mint(msg.sender, minter, mintAmount, mintTokens);
@@ -68,11 +67,4 @@ contract LendingVaultV1 is LVSetterV1 {
 	function reallocate() external nonReentrant update {
 		_withdrawAndReallocate(0);
 	}
-	
-	/*** Utilities ***/
-	
-	//modifier onlyReallocateManager() {
-	//	require(msg.sender == ILendingVaultV1Factory(factory).reallocateManager(), "LendingVaultV1: UNAUTHORIZED");
-	//	_;
-	//}
 }

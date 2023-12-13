@@ -11,7 +11,6 @@ contract LendingVaultV1Factory is ILendingVaultV1Factory {
 	
 	address public admin;
 	address public pendingAdmin;
-	//address public reallocateManager;
 	address public reservesAdmin;
 	address public reservesPendingAdmin;
 	address public reservesManager;
@@ -35,6 +34,7 @@ contract LendingVaultV1Factory is ILendingVaultV1Factory {
 		string memory name = _name.orElse(string("Impermax ").append(IERC20(address(underlying)).symbol()).append(" Lending Vault"));
 		string memory symbol = _symbol.orElse(string("i").append(IERC20(address(underlying)).symbol()));
 		vault = LVDeployerV1.deployVault();
+		ILendingVaultV1(vault)._setFactory();
 		ILendingVaultV1(vault)._initialize(underlying, name, symbol);
 		allVaults.push(vault);
 		emit VaultCreated(underlying, vault, allVaults.length);
@@ -56,13 +56,6 @@ contract LendingVaultV1Factory is ILendingVaultV1Factory {
 		emit NewAdmin(oldAdmin, admin);
 		emit NewPendingAdmin(oldPendingAdmin, address(0));
 	}
-
-	//function _setReallocateManager(address newReallocateManager) external {
-	//	require(msg.sender == admin, "LendingAggregatorV1Factory: UNAUTHORIZED");
-	//	address oldReallocateManager = reallocateManager;
-	//	reallocateManager = newReallocateManager;
-	//	emit NewReallocateManager(oldReallocateManager, newReallocateManager);
-	//}
 	
 	function _setReservesPendingAdmin(address newReservesPendingAdmin) external {
 		require(msg.sender == reservesAdmin, "LendingAggregatorV1Factory: UNAUTHORIZED");

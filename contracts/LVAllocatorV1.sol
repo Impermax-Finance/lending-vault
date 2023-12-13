@@ -10,37 +10,43 @@ contract LVAllocatorV1 is ILendingVaultV1, PoolToken, LVStorageV1 {
 	using BorrowableHelpers for address;
 	using BorrowableObject for BorrowableObject.Borrowable;
 	
-	function _allocate(IBorrowable borrowable, uint mintAmount) internal returns (uint mintTokens) {
+	function _allocate(IBorrowable borrowable, uint mintAmount, uint _exchangeRate) internal returns (uint mintTokens) {
+		mintTokens = mintAmount.mul(1e18).div(_exchangeRate);
+		if (mintTokens == 0) return 0;
 		underlying.safeTransfer(address(borrowable), mintAmount);
 		mintTokens = borrowable.mint(address(this));
 
 		emit AllocateIntoBorrowable(address(borrowable), mintAmount, mintTokens);
 	}
+	function _allocate(IBorrowable borrowable, uint mintAmount) internal returns (uint mintTokens) {
+		mintTokens = _allocate(borrowable, mintAmount, borrowable.exchangeRate());
+	}
 
-	function _deallocate(IBorrowable borrowable, uint redeemTokens) internal returns (uint redeemAmount) {
+	function _deallocate(IBorrowable borrowable, uint redeemTokens, uint _exchangeRate) internal returns (uint redeemAmount) {
+		redeemAmount = redeemTokens.mul(_exchangeRate).div(1e18);
+		if (redeemAmount == 0) return 0;
+		uint totalBalance = borrowable.totalBalance();
+		if (redeemAmount > totalBalance) {
+			redeemTokens = totalBalance.mul(1e18).div(_exchangeRate);
+		}
 		address(borrowable).safeTransfer(address(borrowable), redeemTokens);
 		redeemAmount = borrowable.redeem(address(this));
 
 		emit DeallocateFromBorrowable(address(borrowable), redeemAmount, redeemTokens);
 	}
-	
-	function _deallocateAtMost(IBorrowable borrowable, uint redeemAmount, uint _exchangeRate) internal returns (uint actualRedeemAmount) {
-		actualRedeemAmount = _deallocate(IBorrowable(borrowable), BorrowableHelpers.tokensForAtMost(redeemAmount, _exchangeRate));
-		require(actualRedeemAmount <= redeemAmount, "LendingVaultV1: DEALLOCATED_TOO_MUCH");
-	}
-	function _deallocateAtMost(IBorrowable borrowable, uint redeemAmount) internal returns (uint actualRedeemAmount) {
-		actualRedeemAmount = _deallocateAtMost(borrowable, redeemAmount, borrowable.exchangeRate());
+	function _deallocate(IBorrowable borrowable, uint redeemTokens) internal returns (uint redeemAmount) {
+		redeemAmount = _deallocate(borrowable, redeemTokens, borrowable.exchangeRate());
 	}
 	
-	function _deallocateAtLeast(IBorrowable borrowable, uint redeemAmount, uint _exchangeRate) internal returns (uint actualRedeemAmount) {
-		actualRedeemAmount = _deallocate(IBorrowable(borrowable), BorrowableHelpers.tokensForAtLeast(redeemAmount, _exchangeRate));
-		require(actualRedeemAmount >= redeemAmount, "LendingVaultV1: DEALLOCATED_NOT_ENOUGH");
+	function _deallocateAtLeastOrMax(IBorrowable borrowable, uint redeemAmount, uint _exchangeRate) internal returns (uint actualRedeemAmount) {
+		actualRedeemAmount = _deallocate(IBorrowable(borrowable), BorrowableHelpers.tokensForAtLeast(redeemAmount, _exchangeRate), _exchangeRate);
 	}
-	function _deallocateAtLeast(IBorrowable borrowable, uint redeemAmount) internal returns (uint actualRedeemAmount) {
-		actualRedeemAmount = _deallocateAtLeast(borrowable, redeemAmount, borrowable.exchangeRate());
+	function _deallocateAtLeastOrMax(IBorrowable borrowable, uint redeemAmount) internal returns (uint actualRedeemAmount) {
+		actualRedeemAmount = _deallocateAtLeastOrMax(borrowable, redeemAmount, borrowable.exchangeRate());
 	}
 
 	function _withdrawAndReallocate(uint withdrawAmount) internal {
+		// initialize borrowablesObj
 		BorrowableObject.Borrowable[] memory borrowablesObj = new BorrowableObject.Borrowable[](borrowables.length);
 		uint borrowablesLength = borrowables.length;
 		for(uint i = 0; i < borrowables.length; i++) {
@@ -74,7 +80,7 @@ contract LVAllocatorV1 is ILendingVaultV1, PoolToken, LVStorageV1 {
 
 		// Allocate in the pool with the highest APR an amount such that the next APR matches the one
 		// of the pool with the second highest APR.
-		// Repeat until all the pools with the highest APR has the same APR.
+		// Repeat until all the pools with the highest APR have the same APR.
 		uint lastCycle = borrowablesLength;
 		for(uint i = 1; i < borrowablesLength; i++) {
 			uint targetRate = borrowablesObj[i].cachedSupplyRate;
@@ -120,38 +126,19 @@ contract LVAllocatorV1 is ILendingVaultV1, PoolToken, LVStorageV1 {
 		// redeem
 		for(uint i = 0; i < borrowablesLength; i++) {
 			if (borrowablesObj[i].ownedSupply < borrowablesObj[i].initialOwnedSupply) {
-				// DEALLOCATE AT LEAST IS WRONG IN THE CASE WE ARE WITHDRAWING ALL THE  AVAILABLE LIQUIDITY
 				uint redeemAmount = borrowablesObj[i].initialOwnedSupply.sub(borrowablesObj[i].ownedSupply);
-				_deallocateAtMost(borrowablesObj[i].borrowableContract, redeemAmount, borrowablesObj[i].exchangeRate);
+				_deallocateAtLeastOrMax(borrowablesObj[i].borrowableContract, redeemAmount, borrowablesObj[i].exchangeRate);
 			}
 		}
 		// mint
-		amountToAllocate = underlying.myBalance();
+		amountToAllocate = underlying.myBalance().sub(withdrawAmount, "LendingVaultV1: NEGATIVE AMOUNT TO ALLOCATE");
 		for(uint i = 0; i < borrowablesLength; i++) {
 			if (borrowablesObj[i].ownedSupply > borrowablesObj[i].initialOwnedSupply) {
 				uint mintAmount = borrowablesObj[i].ownedSupply.sub(borrowablesObj[i].initialOwnedSupply);
 				if (mintAmount > amountToAllocate) mintAmount = amountToAllocate;
 				amountToAllocate = amountToAllocate.sub(mintAmount);
-				_allocate(borrowablesObj[i].borrowableContract, mintAmount);
+				_allocate(borrowablesObj[i].borrowableContract, mintAmount, borrowablesObj[i].exchangeRate);
 			}
 		}
-		
-		/*// redeem
-		for(uint i = 0; i < borrowablesLength; i++) {
-			if (borrowablesObj[i].ownedSupply < borrowablesObj[i].initialOwnedSupply) {
-				// DEALLOCATE AT LEAST IS WRONG IN THE CASE WE ARE WITHDRAWING ALL THE  AVAILABLE LIQUIDITY
-				uint redeemAmount = borrowablesObj[i].initialOwnedSupply.sub(borrowablesObj[i].ownedSupply);
-				_deallocateAtLeast(borrowablesObj[i].borrowableContract, redeemAmount, borrowablesObj[i].exchangeRate);
-			}
-		}
-		// mint
-		for(uint i = 0; i < borrowablesLength; i++) {
-			if (borrowablesObj[i].ownedSupply > borrowablesObj[i].initialOwnedSupply) {
-				uint mintAmount = borrowablesObj[i].ownedSupply.sub(borrowablesObj[i].initialOwnedSupply);
-				_allocate(borrowablesObj[i].borrowableContract, mintAmount);
-			}
-		}*/
-		
-		// TODO WHICH EVENTS TO EMIT?
 	}
 }

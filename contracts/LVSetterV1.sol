@@ -12,8 +12,7 @@ contract LVSetterV1 is LVAllocatorV1 {
 		string calldata _name,
 		string calldata _symbol
 	) external {
-		require(factory == address(0), "LendingVaultV1: FACTORY_ALREADY_SET"); // sufficient check
-		factory = msg.sender;
+		require(msg.sender == factory, "LendingVaultV1: UNAUTHORIZED_DIO"); // sufficient check
 		_setName(_name, _symbol);
 		underlying = _underlying;
 		exchangeRateLast = initialExchangeRate;
@@ -75,16 +74,11 @@ contract LVSetterV1 is LVAllocatorV1 {
 		require(borrowableInfo[borrowable].exists, "LendingVaultV1: BORROWABLE_DOESNT_EXISTS");
 		require(!borrowableInfo[borrowable].enabled, "LendingVaultV1: BORROWABLE_ENABLED");	
 		
-		uint myBalance = borrowable.myUnderlyingBalance();
-		uint availableLiquidity = underlying.balanceOf(address(borrowable));
-		uint redeemAmount = Math.min(myBalance, availableLiquidity);
-		require(redeemAmount > 0, "LendingVaultV1: ZERO_AMOUNT");
-		
-		uint actualRedeemAmount = myBalance <= availableLiquidity ? 
-			_deallocateAtLeast(IBorrowable(borrowable), redeemAmount) : 
-			_deallocateAtMost(IBorrowable(borrowable), redeemAmount);		
+		uint underlyingBalance = borrowable.myUnderlyingBalance();
+		require(underlyingBalance > 0, "LendingVaultV1: ZERO_AMOUNT");
+		uint actualRedeemAmount = _deallocateAtLeastOrMax(IBorrowable(borrowable), underlyingBalance);	
 
-		emit UnwindBorrowable(address(borrowable), redeemAmount, actualRedeemAmount);
+		emit UnwindBorrowable(address(borrowable), underlyingBalance, actualRedeemAmount);
 	}
 	
 	modifier onlyAdmin() {
