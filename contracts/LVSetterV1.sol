@@ -6,13 +6,14 @@ import "./interfaces/ILendingVaultV1Factory.sol";
 contract LVSetterV1 is LVAllocatorV1 {
 
 	uint public constant RESERVE_FACTOR_MAX = 0.90e18; //90%
+	uint private constant MAX_BORROWABLES_LENGTH = 10;
 
 	function _initialize(
 		address _underlying,
 		string calldata _name,
 		string calldata _symbol
 	) external {
-		require(msg.sender == factory, "LendingVaultV1: UNAUTHORIZED_DIO"); // sufficient check
+		require(msg.sender == factory, "LendingVaultV1: UNAUTHORIZED"); // sufficient check
 		_setName(_name, _symbol);
 		underlying = _underlying;
 		exchangeRateLast = initialExchangeRate;
@@ -29,6 +30,7 @@ contract LVSetterV1 is LVAllocatorV1 {
 	function addBorrowable(address borrowable) external onlyAdmin nonReentrant {
 		require(IBorrowable(borrowable).underlying() == underlying, "LendingVaultV1: INVALID_UNDERLYING");
 		require(!borrowableInfo[borrowable].exists, "LendingVaultV1: BORROWABLE_EXISTS");
+		require(borrowables.length < MAX_BORROWABLES_LENGTH, "LendingVaultV1: MAX_BORROWABLES_LENGTH");
 
 		borrowableInfo[borrowable].exists = true;
 		borrowableInfo[borrowable].enabled = true;
