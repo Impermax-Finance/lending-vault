@@ -12,3 +12,16 @@
 ### Contract usage and safety precautions
 - Currently the LendingVault contract assumes that all Borrowable contracts are solvent. There isn't a mechanism in place to realize a loss in case one of the Borrowable contracts become insolvent, therefore the admin should add to the vault only Borrowable contracts considered safe.
 - Due to gas limit restrictions there is a hard cap to the number of N (MAX_BORROWABLE_LENGTH). By default this parameter is set to 10, but this can be lowered or increased depending on the gas limit on the deployment chain.
+
+### Permissionless reallocate
+It was a design choice to keep the reallocate function permissionless, and have it called whenever whenever someone deposits or withdraws liquidity.
+This has pros and cons.
+
+**Pros:**
+- When someone deposits, the vault redistributes the new deposited funds optimally.
+- When someone withdraws, the vault withdraws funds from the pools with the lowest APRs.
+- Anyone who has an interest in the vault offering the highest APR can permissionlessly call the reallocate() function at any time.
+
+**Cons:**
+- The transaction cost is higher (not suitable for Ethereum L1).
+- It is possible to force the vault to earn a suboptimal APR by calling reallocate in the middle of a flash loan. For instance, by depositing a large amount of funds in a Borrowable pool, calling reallocate(), and then withdrawing those funds right after, the effect would be that the vault would withdraw funds from that Borrowable pool even if it's offering the highest APR, effectively leading the vault to earning a suboptimal APR. However this would be fixed by calling reallocate() right after, and in general this shouldn't be an issue since the number of users having interest in the vault earning an optimal APR should be much higher than the users having interest in the vault earning a suboptimal APR.
