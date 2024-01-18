@@ -82,6 +82,7 @@ async function makeLendingVaultHarness(opts = {}) {
 	const vault = await LendingVaultV1Harness.new();
 	await vault._setFactory();
 	await vault._initialize(token.address, "", "");
+	if (opts.factory) await vault._setFactory(opts.factory);
 	return Object.assign(vault, {obj: {token}});
 }
 

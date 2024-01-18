@@ -5,6 +5,10 @@ import "../interfaces/IBorrowable.sol";
 import "../libraries/BorrowableHelpers.sol";
 
 contract LendingVaultV1Harness is LendingVaultV1 {
+
+	function _setFactory(address newFactory) external {
+		factory = newFactory;
+	}
 	
 	function allocate(IBorrowable borrowable, uint mintAmount) external returns (uint mintTokens) {
 		return _allocate(borrowable, mintAmount);
@@ -20,6 +24,10 @@ contract LendingVaultV1Harness is LendingVaultV1 {
 
 	function tokensForAtLeast(uint redeemAmount, uint _exchangeRate) external pure returns (uint redeemTokens) {
 		return BorrowableHelpers.tokensForAtLeast(redeemAmount, _exchangeRate);
+	}
+
+	function getTotalSupplied() external returns (uint totalSupplied) {
+		return _getTotalSupplied();
 	}
 	
 	function _getBorrowableInfo(BorrowableObject.Borrowable memory borrowable) internal pure returns (
@@ -133,4 +141,7 @@ contract LendingVaultV1Harness is LendingVaultV1 {
 		) = _getBorrowableInfo(borrowableObj);
 	}
 
+	modifier onlyAdmin() {
+		_;
+	}
 }

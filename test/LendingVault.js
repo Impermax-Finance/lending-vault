@@ -3,11 +3,13 @@ const {
 	makeBorrowable,
 	makeBorrowables,
 	makeFactory,
+	makeLendingVaultHarness,
 	makeLendingVaultWatcher,
 	LendingVaultV1,
 } = require('./Utils/Impermax');
 const {
 	expectAlmostEqualMantissa,
+	expectEqual,
 	expectRevert,
 	expectEvent,
 	bnMantissa,
@@ -35,7 +37,7 @@ async function setBorrowablesTimestamp(borrowables, time) {
 	}
 }
 async function printSnapshot(vault, borrowables) {
-	//return;
+	return;
 	const exchangeRate = await vault.exchangeRate.call() / 1e18;
 	const totalSupply = await vault.totalSupply() / 1e18;
 	const underlyingBalance = totalSupply * exchangeRate;
@@ -81,9 +83,9 @@ contract('LendingVaultV1', function (accounts) {
 	let receiver = accounts[4];		
 	let reservesManager = accounts[5];		
 	let reservesAdmin = accounts[6];	
-	let reallocateManager = accounts[7];
+	let reallocateManager = accounts[7];	
 
-	/*describe('preliminarary test', () => {
+	describe('preliminarary test', () => {
 		let token;
 		
 		it(`test`, async () => {
@@ -164,7 +166,7 @@ contract('LendingVaultV1', function (accounts) {
 			console.log("balanceBorrowable4", await borrowable4.balanceOf(vault.address) * 1);
 		});
 	
-	});*/
+	});
 	
 
 	describe('test first scenario, reallocate and APRs convergence', () => {
@@ -180,10 +182,14 @@ contract('LendingVaultV1', function (accounts) {
 			borrowables = await makeBorrowables(token, 6);
 			factory = await makeFactory({admin, reservesAdmin});
 			//await factory._setReallocateManager(reallocateManager, {from: admin});
-			vaultAddress = await factory.createVault.call(token.address, "", "");
-			await factory.createVault(token.address, "", "");
-			vault = await LendingVaultV1.at(vaultAddress);
+			//vaultAddress = await factory.createVault.call(token.address, "", "");
+			//await factory.createVault(token.address, "", "");
+			//vault = await LendingVaultV1.at(vaultAddress);
+			vault = await makeLendingVaultHarness({token, factory: factory.address});
 			lendingVaultWatcher = await makeLendingVaultWatcher();
+			
+			await factory._setReservesManager(reservesManager, {from: reservesAdmin});
+			await vault._setReserveFactor(bnMantissa(0), {from: admin});
 			
 			// initialize
 			for(let i = 0; i < borrowables.length; i++) {
@@ -195,7 +201,9 @@ contract('LendingVaultV1', function (accounts) {
 			await vault.mint(user);
 			console.log("INITIAL STATE");
 			await printSnapshot(vault, borrowables);
-			
+		});
+		
+		it(`test first scenario, reallocate and APRs convergence`, async () => {
 			// do borrows and external mint
 			await token.mint(user, oneMantissa.mul(BN(300)));
 			await token.transfer(borrowables[0].address, oneMantissa.mul(BN(100)), {from: user});
@@ -206,126 +214,182 @@ contract('LendingVaultV1', function (accounts) {
 			await borrowables[3].simulateBorrow(oneMantissa.mul(BN(300)));
 			console.log("AFTER MINT AND BORROWS");
 			await printSnapshot(vault, borrowables);
-			await vault.reallocate({from: reallocateManager});
-			console.log("AFTER REALLOCATE");
+			const reallocateReceipt = await vault.reallocate({from: reallocateManager});
+			console.log("AFTER REALLOCATE - gas used:", reallocateReceipt.receipt.gasUsed);
 			await printSnapshot(vault, borrowables);
-			
+		});
+
+		it(`test first scenario, reallocate and APRs convergence`, async () => {
 			// wait some time
 			await setBorrowablesTimestamp(borrowables, 3600 * 24 * 5);
 			console.log("AFTER 5 DAYS");
 			await printSnapshot(vault, borrowables);
-			
 			// increase APR of borrowable 4
 			await borrowables[4].simulateBorrow(oneMantissa.mul(BN(600)));
 			await setBorrowablesTimestamp(borrowables, 3600 * 24 * 10);
 			console.log("AFTER 10 DAYS");
+			// wasting around 14% of mint/redeem tx cost with current implementation of getTotalSupplied
+			const receipt1 = await vault.getTotalSupplied();
+			const receipt2 = await vault.getTotalSupplied();
+			console.log(receipt1.receipt.gasUsed, receipt2.receipt.gasUsed)
 			await printSnapshot(vault, borrowables);
-			await vault.reallocate({from: reallocateManager});
-			console.log("AFTER REALLOCATE");
+			const reallocateReceipt = await vault.reallocate({from: reallocateManager});
+			console.log("AFTER REALLOCATE - gas used:", reallocateReceipt.receipt.gasUsed);
 			await printSnapshot(vault, borrowables);
-			
+			console.log("FACTORY", factory.address, await vault.factory());
+		});
+		
+		it(`test first scenario, reallocate and APRs convergence`, async () => {
 			// increase APR of borrowable 1
 			await borrowables[1].simulateBorrow(oneMantissa.mul(BN(1500)));
 			await setBorrowablesTimestamp(borrowables, 3600 * 24 * 13);
 			console.log("AFTER 13 DAYS");
 			await printSnapshot(vault, borrowables);
-			await vault.reallocate({from: reallocateManager});
-			console.log("AFTER REALLOCATE");
+			const reallocateReceipt = await vault.reallocate({from: reallocateManager});
+			console.log("AFTER REALLOCATE - gas used:", reallocateReceipt.receipt.gasUsed);
 			await printSnapshot(vault, borrowables);
-			
+		});
+		
+		it(`test first scenario, reallocate and APRs convergence`, async () => {
 			await setBorrowablesTimestamp(borrowables, 3600 * 24 * 16);
 			await token.mint(user, oneMantissa.mul(BN(600)));
 			await token.transfer(vault.address, oneMantissa.mul(BN(600)), {from: user});
-			await vault.mint(user);
-			console.log("AFTER 16 DAYS AND MINT");
+			const mintReceipt = await vault.mint(user);
+			console.log("AFTER 16 DAYS AND MINT - gas used:", mintReceipt.receipt.gasUsed);
 			await printSnapshot(vault, borrowables);
+		});
+		
+		it(`after 19 days, and test mintReserves`, async () => {
+			const initialExchangeRate = await vault.exchangeRate.call();
+			await vault.exchangeRate();
+			const totalSupply = await vault.totalSupply();
+			const initialBalance = await vault.balanceOf(reservesManager);
+			expectEqual(initialBalance, bnMantissa(0));
+			await vault._setReserveFactor(bnMantissa(0.1), {from: admin});
 			
 			await setBorrowablesTimestamp(borrowables, 3600 * 24 * 19);
-			await vault.reallocate({from: reallocateManager});
-			console.log("AFTER 19 DAYS AND REALLOCATE");
+			const reallocateReceipt = await vault.reallocate({from: reallocateManager});
+			console.log("AFTER 19 DAYS AND REALLOCATE - gas used:", reallocateReceipt.receipt.gasUsed);
 			await printSnapshot(vault, borrowables);
 			
+			console.log("FACTORY", factory.address, await vault.factory());
+			console.log("totalSupply", await vault.totalSupply() / 1e18);
+			console.log("totalBalance", await vault.totalBalance() / 1e18);
+			console.log("exchangeRateLast", await vault.exchangeRateLast() / 1e18);
+			console.log("reserveFactor", await vault.reserveFactor() / 1e18);
+			console.log("getTotalSupplied", await vault.getTotalSupplied.call() / 1e18);
+			console.log("reservesManager", await factory.reservesManager());
+			
+			const finalExchangeRate = await vault.exchangeRate.call();
+			await vault.exchangeRate();
+			const finalBalance = await vault.balanceOf(reservesManager);
+			const expectedBalance = bnMantissa(((finalExchangeRate - initialExchangeRate) * 0.1 / 0.9) / finalExchangeRate * totalSupply / 1e18);
+			expectAlmostEqualMantissa(finalBalance, expectedBalance);
+		});
+		
+		it(`test first scenario, reallocate and APRs convergence`, async () => {
 			await setBorrowablesTimestamp(borrowables, 3600 * 24 * 22);
-			await vault.reallocate({from: reallocateManager});
-			console.log("AFTER 22 DAYS AND REALLOCATE");
+			const reallocateReceipt = await vault.reallocate({from: reallocateManager});
+			console.log("AFTER 22 DAYS AND REALLOCATE - gas used:", reallocateReceipt.receipt.gasUsed);
 			await printSnapshot(vault, borrowables);
-			
+		});
+		
+		it(`test first scenario, reallocate and APRs convergence`, async () => {
 			// redeem
 			await setBorrowablesTimestamp(borrowables, 3600 * 24 * 24);
 			await vault.transfer(vault.address, oneMantissa.mul(BN(900)), {from: user});
-			await vault.redeem(user);
+			const redeemReceipt = await vault.redeem(user);
 			console.log("user balance:", await token.balanceOf(user) / 1e18); 
-			console.log("AFTER 24 DAYS AND REDEEM");
+			console.log("AFTER 24 DAYS AND REDEEM - gas used:", redeemReceipt.receipt.gasUsed);
 			await printSnapshot(vault, borrowables);
-			
+		});
+		
+		it(`test first scenario, reallocate and APRs convergence`, async () => {
 			// borrow and redeem
 			await borrowables[4].simulateBorrowBurningTokens(oneMantissa.mul(BN(80)));
 			await vault.transfer(vault.address, oneMantissa.mul(BN(150)), {from: user});
-			await vault.redeem(user);
-			console.log("AFTER BORROW AND REDEEM WITH LOCKED LIQUIDITY");
+			const redeemReceipt = await vault.redeem(user);
+			console.log("AFTER BORROW AND REDEEM WITH LOCKED LIQUIDITY - gas used:", redeemReceipt.receipt.gasUsed);
 			await printSnapshot(vault, borrowables);
 		});
 		
 		it(`make the exchangeRate grow to test with high number`, async () => {
-			
 			await setBorrowablesTimestamp(borrowables, 3600 * 24 * 40);
-			await vault.reallocate({from: reallocateManager});
-			console.log("40 DAYS");
+			const reallocateReceipt = await vault.reallocate({from: reallocateManager});
+			console.log("AFTER 40 DAYS AND REALLOCATE - gas used:", reallocateReceipt.receipt.gasUsed);
 			await printSnapshot(vault, borrowables);
-			
+		});
+		
+		it(`make the exchangeRate grow to test with high number`, async () => {
 			await setBorrowablesTimestamp(borrowables, 3600 * 24 * 60);
-			await vault.reallocate({from: reallocateManager});
-			console.log("60 DAYS");
+			const reallocateReceipt = await vault.reallocate({from: reallocateManager});
+			console.log("AFTER 60 DAYS AND REALLOCATE - gas used:", reallocateReceipt.receipt.gasUsed);
 			await printSnapshot(vault, borrowables);
-			
+		});
+		
+		it(`make the exchangeRate grow to test with high number`, async () => {
 			await setBorrowablesTimestamp(borrowables, 3600 * 24 * 100);
-			await vault.reallocate({from: reallocateManager});
-			console.log("100 DAYS");
+			const reallocateReceipt = await vault.reallocate({from: reallocateManager});
+			console.log("AFTER 100 DAYS AND REALLOCATE - gas used:", reallocateReceipt.receipt.gasUsed);
 			await printSnapshot(vault, borrowables);
-			
+		});
+		
+		it(`make the exchangeRate grow to test with high number`, async () => {
 			await setBorrowablesTimestamp(borrowables, 3600 * 24 * 200);
-			await vault.reallocate({from: reallocateManager});
-			console.log("200 DAYS");
+			const reallocateReceipt = await vault.reallocate({from: reallocateManager});
+			console.log("AFTER 200 DAYS AND REALLOCATE - gas used:", reallocateReceipt.receipt.gasUsed);
 			await printSnapshot(vault, borrowables);
-			
+		});
+		
+		it(`make the exchangeRate grow to test with high number`, async () => {
 			await setBorrowablesTimestamp(borrowables, 3600 * 24 * 400);
-			await vault.reallocate({from: reallocateManager});
-			console.log("400 DAYS");
+			const reallocateReceipt = await vault.reallocate({from: reallocateManager});
+			console.log("AFTER 400 DAYS AND REALLOCATE - gas used:", reallocateReceipt.receipt.gasUsed);
 			await printSnapshot(vault, borrowables);
-			
+		});
+		
+		it(`make the exchangeRate grow to test with high number`, async () => {
 			await vault.transfer(vault.address, bnMantissa(0.0001), {from: user});
-			await vault.redeem(user);
-			console.log("REDEEM");
+			const redeemReceipt = await vault.redeem(user);
+			console.log("REDEEM - gas used:", redeemReceipt.receipt.gasUsed);
 			await printSnapshot(vault, borrowables);
-			
+		});
+		
+		it(`make the exchangeRate grow to test with high number`, async () => {
 			await setBorrowablesTimestamp(borrowables, 3600 * 24 * 405);
 			await token.mint(user, oneMantissa.mul(BN(200000)));
 			await token.transfer(vault.address, oneMantissa.mul(BN(200000)), {from: user});
-			await vault.mint(user);
-			console.log("405 DAYS MINT");
+			const mintReceipt = await vault.mint(user);
+			console.log("AFTER 405 DAYS AND MINT - gas used:", mintReceipt.receipt.gasUsed);
 			await printSnapshot(vault, borrowables);
-			
+		});
+		
+		it(`make the exchangeRate grow to test with high number`, async () => {
 			await setBorrowablesTimestamp(borrowables, 3600 * 24 * 410);
 			await token.mint(user, oneMantissa.mul(BN(1000000)));
 			await token.transfer(vault.address, oneMantissa.mul(BN(1000000)), {from: user});
-			await vault.mint(user);
-			console.log("410 DAYS MINT");
+			const mintReceipt = await vault.mint(user);
+			console.log("AFTER 410 DAYS AND MINT - gas used:", mintReceipt.receipt.gasUsed);
 			await printSnapshot(vault, borrowables);
-			
+		});
+		
+		it(`make the exchangeRate grow to test with high number`, async () => {
 			await setBorrowablesTimestamp(borrowables, 3600 * 24 * 415);
 			await borrowables[4].simulateBorrowBurningTokens(oneMantissa.mul(BN(200000)));
 			await vault.transfer(vault.address, oneMantissa.mul(BN(50)), {from: user});
-			await vault.redeem(user);
-			console.log("415 DAYS BORROW AND REDEEM");
+			const redeemReceipt = await vault.redeem(user);
+			console.log("415 DAYS BORROW AND REDEEM - gas used:", redeemReceipt.receipt.gasUsed);
 			await printSnapshot(vault, borrowables);
-			
+		});
+		
+		it(`make the exchangeRate grow to test with high number`, async () => {
 			const availableLiquidity = await lendingVaultWatcher.getAvailableLiquidity.call(vault.address);
 			const exchangeRate = await vault.exchangeRate.call();
 			const availableTokens = availableLiquidity.mul(oneMantissa).div(exchangeRate);
 			console.log("availableLiquidity", availableLiquidity / 1e18);
 			await vault.transfer(vault.address, availableTokens, {from: user});
-			await vault.redeem(user);
-			console.log("REDEEM ALL AVAILABLE LIQUIDITY");
+			const redeemReceipt = await vault.redeem(user);
+			console.log("REDEEM ALL AVAILABLE LIQUIDITY - gas used:", redeemReceipt.receipt.gasUsed);
 			await printSnapshot(vault, borrowables);
 		});
 		
@@ -337,7 +401,7 @@ contract('LendingVaultV1', function (accounts) {
 	});
 	
 
-	/*describe('test unwinding', () => {
+	describe('test unwinding', () => {
 		let token;
 		
 		it(`test unwinding`, async () => {
@@ -384,5 +448,5 @@ contract('LendingVaultV1', function (accounts) {
 			console.log("AFTER REALLOCATE");
 			await printSnapshot(vault, borrowables);
 		});
-	});*/
+	});
 });
