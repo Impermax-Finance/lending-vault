@@ -12,3 +12,19 @@ LendingVaultV1Flattened.sol
 LendingVaultWatcher01Flattened.sol
 LVDeployerFlattened.sol
 notes.txt
+
+config.json
+
+# Hardhat files
+/cache
+/artifacts
+
+# TypeChain files
+/typechain
+/typechain-types
+
+# solidity-coverage files
+/coverage
+/coverage.json
+
+.DS_Store
