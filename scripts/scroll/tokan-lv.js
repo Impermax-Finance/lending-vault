@@ -1,7 +1,6 @@
 const { ethers } = require("hardhat");
 
 const reserveAdmin = "0x9fd93712400902bff6040efa72B28Bf80152F056"
-// const ownerAddr = "0x5ec869c1cb378bb77bc55bb56129399f6828c8c5"
 
 const underlyings = [
   {
@@ -14,6 +13,7 @@ const underlyings = [
       "0xb492DEA66BacC684E18b5D423265a57E2969eCcf", // weth/stone
       "0x669B85EF150180365c44149e6685933079B4b515", // weth/wrset
       "0x261c172cba86B745c46060F856A64bd2Dd9D2Fd0", // wbtc/weth
+      "0x6bb698fcfec8BC3cfF098Fef50e48A3712cb5F2B", // weth/wsteth
     ]
   },
   {

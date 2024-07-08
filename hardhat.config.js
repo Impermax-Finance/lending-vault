@@ -45,7 +45,7 @@ module.exports = {
     scroll: {
       url: "https://rpc.ankr.com/scroll",
       accounts: [config.scroll_key],
-      gasPrice: 500000000,
+      gasPrice: 300000000,
     },
     base: {
       url: "https://base-mainnet.public.blastapi.io",
