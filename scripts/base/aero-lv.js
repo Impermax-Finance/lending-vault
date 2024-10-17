@@ -29,6 +29,14 @@ async function main() {
   const [owner] = await ethers.getSigners();
   console.log(owner.address);
 
+  // deploy watcher
+  const LVWatcher = await ethers.getContractFactory("LendingVaultWatcher01");
+  const lvWatcher = await LVWatcher.deploy();
+  await lvWatcher.waitForDeployment();
+  const lvWatcherAddr = await lvWatcher.getAddress();
+
+  console.log(`LVWatcher deployed to: ${lvWatcherAddr}`)
+
   // deploy LVDeployer
   const LVDeployerV1 = await ethers.getContractFactory("LVDeployerV1");
   const lvDeployer = await LVDeployerV1.deploy();
