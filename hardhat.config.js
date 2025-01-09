@@ -58,6 +58,10 @@ module.exports = {
     bob_sepolia: {
       url: "https://testnet.rpc.gobob.xyz",
       accounts: [config.sepolia_key]
+    },
+    sonic: {
+      url: "https://rpc.soniclabs.com",
+      accounts: [config.scroll_key]
     }
   },
   solidity: {
@@ -100,7 +104,8 @@ module.exports = {
       scroll: config.scroll_api_key,
       bob: config.mantle_api_key,
       base: config.base_api_key,
-      polygon: config.matic_api_key
+      polygon: config.matic_api_key,
+      sonic: config.sonic_api_key,
     },
     customChains: [
       {
@@ -134,7 +139,15 @@ module.exports = {
           apiURL: "https://explorer.gobob.xyz/api",
           browserURL: "https://explorer.gobob.xyz"
         }
-      }
+      },
+      {
+        network: 'sonic',
+        chainId: 146,
+        urls: {
+          apiURL: "https://api.sonicscan.org/api",
+          browserURL: "https://sonicscan.org"
+        }
+      },
     ]
   }
 };

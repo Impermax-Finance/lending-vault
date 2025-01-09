@@ -104,6 +104,7 @@ main().catch((error) => {
   process.exitCode = 1;
 });
 
+// LVWater deployed to: 0x1c79103cEc595b8af673Cd41271861FFA3B2BEDA
 // LVDeployer deployed to: 0x47D568AE36AAf9aAc43DD82367BA3ACb32aFB198
 // LVFactory deployed to: 0xaEA22Da48d4c15Ab10B8B7ad529c189ec9Ae24fE
 
