@@ -11,6 +11,7 @@ const underlyings = [
     borrowables: [
       "0x7fbb6111eAC6e4CB5F5cFfbaa39903Ff4340FF59", // usdc/eth
       "0x1Cc240ED506BB7Ee062B4916873e934eA1dd2194", // eth/cbbtc
+      "0x36e474b287532c92c4509efe44d19bb69fa6b423", // eth/usdc univ2
     ]
   },
   {
@@ -22,10 +23,20 @@ const underlyings = [
       "0x8D376D16c70Ec456Cb8bE03c12Ce65A9A0584FfD", // usdc/weth
       "0x4ddA3Ae5576B7D5B42626D671d1Ae738716bc459", // usdc/aero
       "0xCe34f45B98731E5DAE4E0BAAE37eBa63Ba07d684", // usdc/cbbtc
+      "0x43EF63ae565fCFbbc277A4C634321c634820ad79", // eth/usdc univ2
     ]
   },
   {
     ind: 2,
+    address: "0x4200000000000000000000000000000000000006", // ETH - medium risk
+    symbol: "ibexETHV2",
+    name: "Impermax Lent ETH V2",
+    borrowables: [
+      "0x90f5c47cfb7dE8E657eBB174D90E3A4d8D64cDD0", // virtual/eth
+    ]
+  },
+  {
+    ind: 3,
     address: "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf", // cbBTC
     symbol: "ibexcbBTC",
     name: "Impermax Lent cbBTC",
@@ -95,3 +106,8 @@ main().catch((error) => {
 
 // LVDeployer deployed to: 0x47D568AE36AAf9aAc43DD82367BA3ACb32aFB198
 // LVFactory deployed to: 0xaEA22Da48d4c15Ab10B8B7ad529c189ec9Ae24fE
+
+// ibexETH: 0x0a19875829fDF28b8e3230A3F1EB46668240cc11
+// ibexUSDC: 0x929265aaD975CfeDedb65A19a05A3Be2196766F1
+// ibexcbBTC: 0xc68c47085D2B53A0A782c168D1b54a913A668cB5
+// ibexETHV2: 0x683Cc7cbB8B8C5b3c5Fae85A4AE70e887217883B
