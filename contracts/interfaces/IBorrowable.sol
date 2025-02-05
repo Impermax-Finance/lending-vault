@@ -44,26 +44,18 @@ interface IBorrowable {
 	/*** Borrowable ***/
 
 	event BorrowApproval(address indexed owner, address indexed spender, uint value);
-	event Borrow(address indexed sender, address indexed borrower, address indexed receiver, uint borrowAmount, uint repayAmount, uint accountBorrowsPrior, uint accountBorrows, uint totalBorrows);
-	event Liquidate(address indexed sender, address indexed borrower, address indexed liquidator, uint seizeTokens, uint repayAmount, uint accountBorrowsPrior, uint accountBorrows, uint totalBorrows);
 	
-	function BORROW_FEE() external pure returns (uint);
 	function collateral() external view returns (address);
 	function reserveFactor() external view returns (uint);
 	function exchangeRateLast() external view returns (uint);
 	function borrowIndex() external view returns (uint);
 	function totalBorrows() external view returns (uint);
 	function borrowAllowance(address owner, address spender) external view returns (uint);
-	function borrowBalance(address borrower) external view returns (uint);	
-	function borrowTracker() external view returns (address);
 	
 	function BORROW_PERMIT_TYPEHASH() external pure returns (bytes32);
 	function borrowApprove(address spender, uint256 value) external returns (bool);
 	function borrowPermit(address owner, address spender, uint value, uint deadline, uint8 v, bytes32 r, bytes32 s) external;
-	function borrow(address borrower, address receiver, uint borrowAmount, bytes calldata data) external;
-	function liquidate(address borrower, address liquidator) external returns (uint seizeTokens);
-	function trackBorrow(address borrower) external;
-	
+
 	/*** Borrowable Interest Rate Model ***/
 
 	event AccrueInterest(uint interestAccumulated, uint borrowIndex, uint totalBorrows);
@@ -87,7 +79,6 @@ interface IBorrowable {
 	event NewReserveFactor(uint newReserveFactor);
 	event NewKinkUtilizationRate(uint newKinkUtilizationRate);
 	event NewAdjustSpeed(uint newAdjustSpeed);
-	event NewBorrowTracker(address newBorrowTracker);
 
 	function RESERVE_FACTOR_MAX() external pure returns (uint);
 	function KINK_UR_MIN() external pure returns (uint);
@@ -104,5 +95,4 @@ interface IBorrowable {
 	function _setReserveFactor(uint newReserveFactor) external;
 	function _setKinkUtilizationRate(uint newKinkUtilizationRate) external;
 	function _setAdjustSpeed(uint newAdjustSpeed) external;
-	function _setBorrowTracker(address newBorrowTracker) external;
 }
