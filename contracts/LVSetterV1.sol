@@ -42,7 +42,7 @@ contract LVSetterV1 is LVAllocatorV1 {
 	function removeBorrowable(address borrowable) external onlyAdmin nonReentrant {
 		require(borrowableInfo[borrowable].exists, "LendingVaultV1: BORROWABLE_DOESNT_EXISTS");
 		require(!borrowableInfo[borrowable].enabled, "LendingVaultV1: BORROWABLE_ENABLED");
-		require(borrowable.balanceOf(address(this)) == 0, "LendingVaultV1: NOT_EMPTY");
+		require(borrowable.myUnderlyingBalance() == 0, "LendingVaultV1: NOT_EMPTY");
 
 		uint lastIndex = borrowables.length - 1;
 		uint index = indexOfBorrowable(borrowable);
@@ -78,7 +78,9 @@ contract LVSetterV1 is LVAllocatorV1 {
 		
 		uint underlyingBalance = borrowable.myUnderlyingBalance();
 		require(underlyingBalance > 0, "LendingVaultV1: ZERO_AMOUNT");
-		uint actualRedeemAmount = _deallocateAtLeastOrMax(IBorrowable(borrowable), underlyingBalance);	
+		
+		uint redeemTokens = borrowable.myBalance();
+		uint actualRedeemAmount = _deallocate(IBorrowable(borrowable), redeemTokens);	
 
 		emit UnwindBorrowable(address(borrowable), underlyingBalance, actualRedeemAmount);
 	}
