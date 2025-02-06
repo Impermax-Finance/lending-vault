@@ -66,6 +66,7 @@ contract LVAllocatorV1 is ILendingVaultV1, PoolToken, LVStorageV1 {
 			amountToAllocate = amountToAllocate.add(amount);
 		}
 		amountToAllocate = amountToAllocate.sub(withdrawAmount, "LendingVaultV1: INSUFFICIENT_LIQUIDITY");
+		if (borrowablesLength == 0) return;
 		
 		// bubblesort borrowablesObj
 		for (uint i = 0; i < borrowablesLength - 1; i++) {
