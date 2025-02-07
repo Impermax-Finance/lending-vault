@@ -21,5 +21,5 @@ contract LVStorageV1 {
 
 	uint public exchangeRateLast;
 
-	uint public reserveFactor = 0.10e18; //10%
+	uint public reserveFactor = 0.00e18; //0%
 }

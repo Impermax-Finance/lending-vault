@@ -50,7 +50,7 @@ contract('LVSetter', function (accounts) {
 		});
 		
 		it('initialization check', async () => {
-			const reserveFactor = bnMantissa(0.1);
+			const reserveFactor = bnMantissa(0);
 			expectAlmostEqualMantissa(await vault.reserveFactor(), reserveFactor);
 			expectEqual(await vault.getBorrowablesLength(), BN(0));
 			expectEqual(await vault.exchangeRate.call(), await vault.exchangeRateLast());
