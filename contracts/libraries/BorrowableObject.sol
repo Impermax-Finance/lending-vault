@@ -113,16 +113,18 @@ library BorrowableObject {
 			);
 			targetUtilizationRate = tmp.add(b).div(a).div(2);
 		}
-		require(targetUtilizationRate <= 1e18, "ERROR: TARGET UTILIZATION > 100%");
 	}
 
 	function calculateAmountForRate(Borrowable memory borrowable, uint rate) internal pure returns (uint) {
 		require(rate > 0, "ERROR: rate = 0");
 		require(rate <= borrowable.cachedSupplyRate, "ERROR: TARGET RATE > CACHED RATE");
 		uint targetUtilizationRate = calculateUtilizationForRate(borrowable, rate);
-		require(targetUtilizationRate <= utilizationRate(borrowable), "ERROR: TARGET UTILIZATION > CURRENT UTILIZATION");
 		uint targetSupply = borrowable.totalBorrows.mul(1e18).div(targetUtilizationRate);
-		return targetSupply.sub(totalSupply(borrowable), "ERROR: TARGET SUPPLY > TOTAL SUPPLY");
+		if (targetSupply < totalSupply(borrowable)) {
+			// catch any edge scenarios...
+			return 0;
+		}
+		return targetSupply.sub(totalSupply(borrowable));
 	}
 
 	function compare(Borrowable memory borrowableA, Borrowable memory borrowableB) internal pure returns (bool) {
