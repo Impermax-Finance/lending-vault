@@ -21,12 +21,48 @@ const MAX_UINT_256 = (new BN(2)).pow(new BN(256)).sub(new BN(1));
 const SECONDS_IN_YEAR = new BN(31536000);
 
 
+
+
+
 contract('BorrowableObject', function (accounts) {
 	let root = accounts[0];
 	let user = accounts[1];
 	
 	describe('borrowableObject Math', () => {
 		let borrowableObject; 
+
+		const getBorrowableObjectData = (scenarioInput) => {
+			return {
+				borrowableContract: address(0),
+				exchangeRate: oneMantissa.toString(),
+				totalBorrows: bnMantissa(scenarioInput.totalBorrows).toString(),
+				externalSupply: bnMantissa(scenarioInput.externalSupply).toString(),
+				initialOwnedSupply: bnMantissa(scenarioInput.ownedSupply).toString(),
+				ownedSupply: bnMantissa(scenarioInput.ownedSupply).toString(),
+				kinkBorrowRate: bnMantissa(scenarioInput.kinkBorrowAPR).div(SECONDS_IN_YEAR).toString(),
+				kinkUtilizationRate: bnMantissa(scenarioInput.kinkUtilizationRate).toString(),
+				reserveFactor: bnMantissa(scenarioInput.reserveFactor).toString(),
+				kinkMultiplier: (new BN(scenarioInput.kinkMultiplier)).toString(),
+				cachedSupplyRate: MAX_UINT_256.toString(),
+			}
+		}
+
+		const testCalculateAmountForRate = async (borrowableObjectData, desiredRate) => {
+			if (desiredRate * 1 > await borrowableObject.supplyRate(borrowableObjectData) * 1) {
+				console.log("WARNING: DESIRED RATE TOO HIGH");
+			}
+			
+			const nextUtilizationRate = await borrowableObject.calculateUtilizationForRate(borrowableObjectData, desiredRate);
+			const amount = await borrowableObject.calculateAmountForRate(borrowableObjectData, desiredRate);
+			
+			borrowableObjectData.ownedSupply = (new BN(borrowableObjectData.ownedSupply)).add(amount).toString();
+			
+			console.log("nextUtilizationRate", nextUtilizationRate / 1e18);
+			console.log("final supply APR", await borrowableObject.supplyRate(borrowableObjectData) / 1e18 * SECONDS_IN_YEAR);
+			
+			expectAlmostEqualMantissa(await borrowableObject.utilizationRate(borrowableObjectData), nextUtilizationRate);
+			expectAlmostEqualMantissa(await borrowableObject.supplyRate(borrowableObjectData), desiredRate);
+		}
 		
 		before(async () => {
 			borrowableObject = await makeBorrowableObjectHarness();
@@ -124,25 +160,9 @@ contract('BorrowableObject', function (accounts) {
 				},
 			},
 		].forEach(scenario => {
-			it('check scenario ' + JSON.stringify(scenario), async () => {
-				a = 1
-				b = 0.6
-				c = 0.177
+			it('check comnplete scenario ' + JSON.stringify(scenario), async () => {
+				const borrowableObjectData = getBorrowableObjectData(scenario.input);
 				
-				const borrowableObjectData = {
-					borrowableContract: address(0),
-					exchangeRate: oneMantissa.toString(),
-					totalBorrows: bnMantissa(scenario.input.totalBorrows).toString(),
-					externalSupply: bnMantissa(scenario.input.externalSupply).toString(),
-					initialOwnedSupply: bnMantissa(scenario.input.ownedSupply).toString(),
-					ownedSupply: bnMantissa(scenario.input.ownedSupply).toString(),
-					kinkBorrowRate: bnMantissa(scenario.input.kinkBorrowAPR).div(SECONDS_IN_YEAR).toString(),
-					kinkUtilizationRate: bnMantissa(scenario.input.kinkUtilizationRate).toString(),
-					reserveFactor: bnMantissa(scenario.input.reserveFactor).toString(),
-					kinkMultiplier: (new BN(scenario.input.kinkMultiplier)).toString(),
-					cachedSupplyRate: MAX_UINT_256.toString(),
-				};
-				const desiredRate = bnMantissa(scenario.input.desiredAPR).div(SECONDS_IN_YEAR).toString();
 				const expectedTotalSupply = bnMantissa(scenario.output.totalSupply);
 				const expectedUtilizationRate = bnMantissa(scenario.output.utilizationRate);
 				const expectedKinkRate = bnMantissa(scenario.output.kinkAPR).div(SECONDS_IN_YEAR);
@@ -153,13 +173,32 @@ contract('BorrowableObject', function (accounts) {
 				expectAlmostEqualMantissa(await borrowableObject.kinkRate(borrowableObjectData), expectedKinkRate);
 				expectAlmostEqualMantissa(await borrowableObject.supplyRate(borrowableObjectData), expectedSupplyRate);
 				
-				const nextUtilizationRate = await borrowableObject.calculateUtilizationForRate(borrowableObjectData, desiredRate);
-				const amount = await borrowableObject.calculateAmountForRate(borrowableObjectData, desiredRate);
-				
-				borrowableObjectData.ownedSupply = (new BN(borrowableObjectData.ownedSupply)).add(amount).toString();
-				
-				expectAlmostEqualMantissa(await borrowableObject.utilizationRate(borrowableObjectData), nextUtilizationRate);
-				expectAlmostEqualMantissa(await borrowableObject.supplyRate(borrowableObjectData), desiredRate);
+				const desiredRate = bnMantissa(scenario.input.desiredAPR).div(SECONDS_IN_YEAR).toString();
+				await testCalculateAmountForRate(borrowableObjectData, desiredRate);
+			});
+		});
+		
+		[
+			{totalBorrows: 49,		externalSupply: 30,		ownedSupply: 20,	kinkBorrowAPR: 0.3,		kinkUtilizationRate: 0.7,		reserveFactor: 0,		kinkMultiplier: 2,		desiredAPR: 0.209},
+			{totalBorrows: 49,		externalSupply: 30,		ownedSupply: 20,	kinkBorrowAPR: 0.3,		kinkUtilizationRate: 0.7,		reserveFactor: 0,		kinkMultiplier: 2,		desiredAPR: 0.211},
+			{totalBorrows: 50,		externalSupply: 30,		ownedSupply: 20,	kinkBorrowAPR: 0.3,		kinkUtilizationRate: 0.7,		reserveFactor: 0,		kinkMultiplier: 2,		desiredAPR: 0.599},
+			{totalBorrows: 50,		externalSupply: 30,		ownedSupply: 20,	kinkBorrowAPR: 0.3,		kinkUtilizationRate: 0.7,		reserveFactor: 0,		kinkMultiplier: 2,		desiredAPR: 0.001},
+			{totalBorrows: 501.5,	externalSupply: 202,	ownedSupply: 409.6,	kinkBorrowAPR: 1.153,	kinkUtilizationRate: 0.85,		reserveFactor: 0.5,		kinkMultiplier: 3,		desiredAPR: 0.2},
+			{totalBorrows: 501.5,	externalSupply: 202,	ownedSupply: 409.6,	kinkBorrowAPR: 1.153,	kinkUtilizationRate: 0.85,		reserveFactor: 0.5,		kinkMultiplier: 3,		desiredAPR: 0.45},
+			{totalBorrows: 501.5,	externalSupply: 152,	ownedSupply: 409.6,	kinkBorrowAPR: 1.153,	kinkUtilizationRate: 0.75,		reserveFactor: 0.5,		kinkMultiplier: 3,		desiredAPR: 0.7},
+			//{totalBorrows: 501.5,	externalSupply: 202,	ownedSupply: 409.6,	kinkBorrowAPR: 1.153,	kinkUtilizationRate: 0.75,		reserveFactor: 0.5,		kinkMultiplier: 3,		desiredAPR: 3}, // apr too high
+			//{totalBorrows: 501.5,	externalSupply: 202,	ownedSupply: 409.6,	kinkBorrowAPR: 1.153,	kinkUtilizationRate: 0.75,		reserveFactor: 0.5,		kinkMultiplier: 1,		desiredAPR: 0.45}, // kink multiplier too low
+			//{totalBorrows: 501.5,	externalSupply: 202,	ownedSupply: 409.6,	kinkBorrowAPR: 1.153,	kinkUtilizationRate: 0.4,		reserveFactor: 0.5,		kinkMultiplier: 2,		desiredAPR: 0.6}, // a too low
+			{totalBorrows: 501.5,	externalSupply: 100,	ownedSupply: 409.6,	kinkBorrowAPR: 0.795,	kinkUtilizationRate: 0.9,		reserveFactor: 0,		kinkMultiplier: 2,		desiredAPR: 0.8},
+			{totalBorrows: 501.5,	externalSupply: 100,	ownedSupply: 409.6,	kinkBorrowAPR: 0.795,	kinkUtilizationRate: 0.9,		reserveFactor: 0,		kinkMultiplier: 2,		desiredAPR: 1.385},
+			{totalBorrows: 501.5,	externalSupply: 100,	ownedSupply: 409.6,	kinkBorrowAPR: 0.795,	kinkUtilizationRate: 0.9,		reserveFactor: 0,		kinkMultiplier: 2,		desiredAPR: 0.596},
+			{totalBorrows: 501.5,	externalSupply: 100,	ownedSupply: 409.6,	kinkBorrowAPR: 0.795,	kinkUtilizationRate: 0.8,		reserveFactor: 0,		kinkMultiplier: 2,		desiredAPR: 0.596},
+			{totalBorrows: 501.5,	externalSupply: 100,	ownedSupply: 409.6,	kinkBorrowAPR: 0.795,	kinkUtilizationRate: 0.8,		reserveFactor: 0,		kinkMultiplier: 2,		desiredAPR: 1.495},
+		].forEach(scenario => {
+			it('check calculateAmountForRate ' + JSON.stringify(scenario), async () => {
+				const borrowableObjectData = getBorrowableObjectData(scenario);
+				const desiredRate = bnMantissa(scenario.desiredAPR).div(SECONDS_IN_YEAR).toString();
+				await testCalculateAmountForRate(borrowableObjectData, desiredRate);
 			});
 		});
 	});
