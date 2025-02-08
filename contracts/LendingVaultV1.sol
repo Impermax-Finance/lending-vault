@@ -2,6 +2,8 @@ pragma solidity =0.5.16;
 
 import "./LVSetterV1.sol";
 import "./interfaces/ILendingVaultV1Factory.sol";
+import "./interfaces/ILendingVaultCallee.sol";
+import "./interfaces/IBorrowable.sol";
 
 contract LendingVaultV1 is LVSetterV1 {
 
@@ -66,5 +68,17 @@ contract LendingVaultV1 is LVSetterV1 {
 
 	function reallocate() external nonReentrant update {
 		_withdrawAndReallocate(0);
+	}
+
+	function flashAllocate(address borrowable, uint allocateAmount, bytes calldata data) external nonReentrant update {
+		require(borrowableInfo[borrowable].exists, "LendingVaultV1: BORROWABLE_DOESNT_EXISTS");
+		require(borrowableInfo[borrowable].enabled, "LendingVaultV1: BORROWABLE_DISABLED");
+		
+		_withdrawAndReallocate(allocateAmount);
+		uint exchangeRate = IBorrowable(borrowable).exchangeRate();
+		_allocate(IBorrowable(borrowable), allocateAmount, exchangeRate);
+		ILendingVaultCallee(msg.sender).lendingVaultAllocate(borrowable, allocateAmount, data);
+		_withdrawAndReallocate(0);
+		require(IBorrowable(borrowable).totalBalance() > exchangeRate / 1e15, "LendingVaultV1: INCONVENIENT_REALLOCATION");
 	}
 }

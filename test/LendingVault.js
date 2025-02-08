@@ -21,6 +21,8 @@ const {
 } = require('./Utils/Ethereum');
 const { keccak256, toUtf8Bytes } = require('ethers/utils');
 
+const FlashAllocatePoC = artifacts.require('FlashAllocatePoC');
+
 const oneMantissa = (new BN(10)).pow(new BN(18));
 const K_TRACKER = (new BN(2)).pow(new BN(128));
 const INITIAL_EXCHANGE_RATE = oneMantissa;
@@ -447,6 +449,73 @@ contract('LendingVaultV1', function (accounts) {
 			await vault.reallocate({from: reallocateManager});
 			console.log("AFTER REALLOCATE");
 			await printSnapshot(vault, borrowables);
+		});
+	});
+	
+
+	describe('test flashAllocate', () => {
+		let token;
+		let borrowables;
+		let factory;
+		let vault;
+		let flashAllocator;
+		
+		beforeEach(async () => {
+			factory = await makeFactory({admin, reservesAdmin});
+			flashAllocator = await FlashAllocatePoC.new();
+			token = await makeErc20Token();
+			borrowables = await makeBorrowables(token, 2);
+			const vaultAddress = await factory.createVault.call(token.address, "", "");
+			await factory.createVault(token.address, "", "");
+			vault = await LendingVaultV1.at(vaultAddress);
+		});
+				
+		it(`test initial checks`, async () => {
+			for(let i = 0; i < borrowables.length; i++) {
+				await vault.addBorrowable(borrowables[i].address, {from: admin});
+			}
+			await vault.disableBorrowable(borrowables[0].address, {from: admin});
+			await vault.disableBorrowable(borrowables[1].address, {from: admin});
+			await vault.removeBorrowable(borrowables[0].address, {from: admin});
+			await expectRevert(flashAllocator.executeFlashAllocate(vault.address, borrowables[0].address, bnMantissa(1)), "LendingVaultV1: BORROWABLE_DOESNT_EXISTS");
+			await expectRevert(flashAllocator.executeFlashAllocate(vault.address, borrowables[1].address, bnMantissa(1)), "LendingVaultV1: BORROWABLE_DISABLED");
+		});
+		
+		it(`(almost) all available liquidity can be flash allocated under normal conditions`, async () => {
+			// initialize
+			for(let i = 0; i < borrowables.length; i++) {
+				await vault.addBorrowable(borrowables[i].address, {from: admin});
+				await borrowables[i].simulateBorrow(oneMantissa.mul(BN(300)));
+			}
+			await token.mint(user, oneMantissa.mul(BN(400)));
+			await token.transfer(vault.address, oneMantissa.mul(BN(400)), {from: user});
+			await vault.mint(user);
+			console.log("INITIAL STATE");
+			await printSnapshot(vault, borrowables);
+			
+			// disable and unwind
+			await flashAllocator.executeFlashAllocate(vault.address, borrowables[0].address, bnMantissa(399));
+			console.log("AFTER EXECUTE");
+			await printSnapshot(vault, borrowables);
+		});
+		
+		it(`flash allocate reverts if inconvenient`, async () => {
+			// initialize
+			for(let i = 0; i < borrowables.length; i++) {
+				await vault.addBorrowable(borrowables[i].address, {from: admin});
+				await borrowables[i].simulateBorrow(oneMantissa.mul(BN(300)));
+			}
+			await token.mint(user, oneMantissa.mul(BN(400)));
+			await token.transfer(vault.address, oneMantissa.mul(BN(400)), {from: user});
+			await vault.mint(user);
+			await borrowables[1].simulateBorrow(oneMantissa.mul(BN(3000)));
+			await setBorrowablesTimestamp(borrowables, 3600 * 24 * 2);
+			console.log("INITIAL STATE");
+			await printSnapshot(vault, borrowables);
+			
+			// disable and unwind
+			await expectRevert(flashAllocator.executeFlashAllocate(vault.address, borrowables[0].address, bnMantissa(1)), "LendingVaultV1: INCONVENIENT_REALLOCATION");
+			await flashAllocator.executeFlashAllocate(vault.address, borrowables[1].address, bnMantissa(1));
 		});
 	});
 });
