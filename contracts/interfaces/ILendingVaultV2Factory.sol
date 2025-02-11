@@ -1,6 +1,6 @@
 pragma solidity >=0.5.0;
 
-interface ILendingVaultV1Factory {
+interface ILendingVaultV2Factory {
 	event VaultCreated(address indexed underlying, address vault, uint);
 	event NewPendingAdmin(address oldPendingAdmin, address newPendingAdmin);
 	event NewAdmin(address oldAdmin, address newAdmin);

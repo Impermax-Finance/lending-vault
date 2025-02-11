@@ -5,7 +5,7 @@ const {
 	makeFactory,
 	makeLendingVaultHarness,
 	makeLendingVaultWatcher,
-	LendingVaultV1,
+	LendingVaultV2,
 } = require('./Utils/Impermax');
 const {
 	expectAlmostEqualMantissa,
@@ -77,7 +77,7 @@ async function printSnapshot(vault, borrowables) {
 
 //TODO add expect
 
-contract('LendingVaultV1', function (accounts) {
+contract('LendingVaultV2', function (accounts) {
 	let root = accounts[0];
 	let user = accounts[1];
 	let admin = accounts[2];		
@@ -100,7 +100,7 @@ contract('LendingVaultV1', function (accounts) {
 			//await factory._setReallocateManager(reallocateManager, {from: admin});
 			const vaultAddress = await factory.createVault.call(token.address, "", "");
 			await factory.createVault(token.address, "", "");
-			const vault = await LendingVaultV1.at(vaultAddress);
+			const vault = await LendingVaultV2.at(vaultAddress);
 			
 			//first borrowable
 			await vault.addBorrowable(borrowable1.address, {from: admin});
@@ -186,7 +186,7 @@ contract('LendingVaultV1', function (accounts) {
 			//await factory._setReallocateManager(reallocateManager, {from: admin});
 			//vaultAddress = await factory.createVault.call(token.address, "", "");
 			//await factory.createVault(token.address, "", "");
-			//vault = await LendingVaultV1.at(vaultAddress);
+			//vault = await LendingVaultV2.at(vaultAddress);
 			vault = await makeLendingVaultHarness({token, factory: factory.address});
 			lendingVaultWatcher = await makeLendingVaultWatcher();
 			
@@ -397,7 +397,7 @@ contract('LendingVaultV1', function (accounts) {
 		
 		it(`revert with insufficient liquidity`, async () => {
 			await vault.transfer(vault.address, oneMantissa.mul(BN(100)), {from: user});
-			await expectRevert(vault.redeem(user), 'LendingVaultV1: INSUFFICIENT_LIQUIDITY');
+			await expectRevert(vault.redeem(user), 'LendingVaultV2: INSUFFICIENT_LIQUIDITY');
 		});
 	
 	});
@@ -413,7 +413,7 @@ contract('LendingVaultV1', function (accounts) {
 			//await factory._setReallocateManager(reallocateManager, {from: admin});
 			const vaultAddress = await factory.createVault.call(token.address, "", "");
 			await factory.createVault(token.address, "", "");
-			const vault = await LendingVaultV1.at(vaultAddress);
+			const vault = await LendingVaultV2.at(vaultAddress);
 			
 			// initialize
 			for(let i = 0; i < borrowables.length; i++) {
@@ -467,7 +467,7 @@ contract('LendingVaultV1', function (accounts) {
 			borrowables = await makeBorrowables(token, 2);
 			const vaultAddress = await factory.createVault.call(token.address, "", "");
 			await factory.createVault(token.address, "", "");
-			vault = await LendingVaultV1.at(vaultAddress);
+			vault = await LendingVaultV2.at(vaultAddress);
 		});
 				
 		it(`test initial checks`, async () => {
@@ -477,8 +477,8 @@ contract('LendingVaultV1', function (accounts) {
 			await vault.disableBorrowable(borrowables[0].address, {from: admin});
 			await vault.disableBorrowable(borrowables[1].address, {from: admin});
 			await vault.removeBorrowable(borrowables[0].address, {from: admin});
-			await expectRevert(flashAllocator.executeFlashAllocate(vault.address, borrowables[0].address, bnMantissa(1)), "LendingVaultV1: BORROWABLE_DOESNT_EXISTS");
-			await expectRevert(flashAllocator.executeFlashAllocate(vault.address, borrowables[1].address, bnMantissa(1)), "LendingVaultV1: BORROWABLE_DISABLED");
+			await expectRevert(flashAllocator.executeFlashAllocate(vault.address, borrowables[0].address, bnMantissa(1)), "LendingVaultV2: BORROWABLE_DOESNT_EXISTS");
+			await expectRevert(flashAllocator.executeFlashAllocate(vault.address, borrowables[1].address, bnMantissa(1)), "LendingVaultV2: BORROWABLE_DISABLED");
 		});
 		
 		it(`(almost) all available liquidity can be flash allocated under normal conditions`, async () => {
@@ -514,7 +514,7 @@ contract('LendingVaultV1', function (accounts) {
 			await printSnapshot(vault, borrowables);
 			
 			// disable and unwind
-			await expectRevert(flashAllocator.executeFlashAllocate(vault.address, borrowables[0].address, bnMantissa(1)), "LendingVaultV1: INCONVENIENT_REALLOCATION");
+			await expectRevert(flashAllocator.executeFlashAllocate(vault.address, borrowables[0].address, bnMantissa(1)), "LendingVaultV2: INCONVENIENT_REALLOCATION");
 			await flashAllocator.executeFlashAllocate(vault.address, borrowables[1].address, bnMantissa(1));
 		});
 	});

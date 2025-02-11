@@ -1,6 +1,6 @@
 pragma solidity >=0.5.0;
 
-interface ILendingVaultV1 {
+interface ILendingVaultV2 {
 
 	/*** Impermax ERC20 ***/
 	
@@ -41,7 +41,7 @@ interface ILendingVaultV1 {
 	
 	function _setFactory() external;
 	
-	/*** Lending Vault V1 ***/
+	/*** Lending Vault V2 ***/
 	
 	event AddBorrowable(address indexed borrowable);
 	event RemoveBorrowable(address indexed borrowable);

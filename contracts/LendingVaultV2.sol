@@ -1,11 +1,11 @@
 pragma solidity =0.5.16;
 
-import "./LVSetterV1.sol";
-import "./interfaces/ILendingVaultV1Factory.sol";
+import "./LVSetterV2.sol";
+import "./interfaces/ILendingVaultV2Factory.sol";
 import "./interfaces/ILendingVaultCallee.sol";
 import "./interfaces/IBorrowable.sol";
 
-contract LendingVaultV1 is LVSetterV1 {
+contract LendingVaultV2 is LVSetterV2 {
 
 	function _getTotalSupplied() internal returns (uint totalSupplied) {
 		for (uint i = 0; i < borrowables.length; i++) {
@@ -20,7 +20,7 @@ contract LendingVaultV1 is LVSetterV1 {
 			uint _exchangeRateNew = _exchangeRate.sub( _exchangeRate.sub(_exchangeRateLast).mul(reserveFactor).div(1e18) );
 			uint liquidity = _totalSupply.mul(_exchangeRate).div(_exchangeRateNew).sub(_totalSupply);
 			if (liquidity > 0) {
-				address reservesManager = ILendingVaultV1Factory(factory).reservesManager();
+				address reservesManager = ILendingVaultV2Factory(factory).reservesManager();
 				_mint(reservesManager, liquidity);
 			}
 			exchangeRateLast = _exchangeRateNew;
@@ -48,7 +48,7 @@ contract LendingVaultV1 is LVSetterV1 {
 			mintTokens = mintTokens.sub(MINIMUM_LIQUIDITY);
 			_mint(address(0), MINIMUM_LIQUIDITY);
 		}
-		require(mintTokens > 0, "LendingVaultV1: MINT_AMOUNT_ZERO");
+		require(mintTokens > 0, "LendingVaultV2: MINT_AMOUNT_ZERO");
 		_mint(minter, mintTokens);
 		_withdrawAndReallocate(0);
 		emit Mint(msg.sender, minter, mintAmount, mintTokens);
@@ -59,7 +59,7 @@ contract LendingVaultV1 is LVSetterV1 {
 		uint redeemTokens = balanceOf[address(this)];
 		redeemAmount = redeemTokens.mul(exchangeRate()).div(1e18);
 
-		require(redeemAmount > 0, "LendingVaultV1: REDEEM_AMOUNT_ZERO");
+		require(redeemAmount > 0, "LendingVaultV2: REDEEM_AMOUNT_ZERO");
 		_burn(address(this), redeemTokens);
 		_withdrawAndReallocate(redeemAmount);
 		underlying.safeTransfer(redeemer, redeemAmount);
@@ -71,14 +71,14 @@ contract LendingVaultV1 is LVSetterV1 {
 	}
 
 	function flashAllocate(address borrowable, uint allocateAmount, bytes calldata data) external nonReentrant update {
-		require(borrowableInfo[borrowable].exists, "LendingVaultV1: BORROWABLE_DOESNT_EXISTS");
-		require(borrowableInfo[borrowable].enabled, "LendingVaultV1: BORROWABLE_DISABLED");
+		require(borrowableInfo[borrowable].exists, "LendingVaultV2: BORROWABLE_DOESNT_EXISTS");
+		require(borrowableInfo[borrowable].enabled, "LendingVaultV2: BORROWABLE_DISABLED");
 		
 		_withdrawAndReallocate(allocateAmount);
 		uint exchangeRate = IBorrowable(borrowable).exchangeRate();
 		_allocate(IBorrowable(borrowable), allocateAmount, exchangeRate);
 		ILendingVaultCallee(msg.sender).lendingVaultAllocate(borrowable, allocateAmount, data);
 		_withdrawAndReallocate(0);
-		require(IBorrowable(borrowable).totalBalance() > exchangeRate / 1e15, "LendingVaultV1: INCONVENIENT_REALLOCATION");
+		require(IBorrowable(borrowable).totalBalance() > exchangeRate / 1e15, "LendingVaultV2: INCONVENIENT_REALLOCATION");
 	}
 }

@@ -20,10 +20,10 @@ const { ecsign } = require('ethereumjs-util');
 const MockERC20 = artifacts.require('MockERC20');
 const ImpermaxERC20 = artifacts.require('ImpermaxERC20Harness');
 const Borrowable = artifacts.require('BorrowableHarness');
-const LVDeployerV1 = artifacts.require('LVDeployerV1');
-const LendingVaultV1Factory = artifacts.require('LendingVaultV1Factory');
-const LendingVaultV1 = artifacts.require('LendingVaultV1');
-const LendingVaultV1Harness = artifacts.require('LendingVaultV1Harness');
+const LVDeployerV2 = artifacts.require('LVDeployerV2');
+const LendingVaultV2Factory = artifacts.require('LendingVaultV2Factory');
+const LendingVaultV2 = artifacts.require('LendingVaultV2');
+const LendingVaultV2Harness = artifacts.require('LendingVaultV2Harness');
 const BorrowableObjectHarness = artifacts.require('BorrowableObjectHarness');
 const LendingVaultWatcher01 = artifacts.require('LendingVaultWatcher01');
 
@@ -55,16 +55,16 @@ async function makeBorrowables(token, size) {
 	return borrowables;
 }
 
-async function makeLVDeployerV1(opts = {}) {
-	return await LVDeployerV1.new();
+async function makeLVDeployerV2(opts = {}) {
+	return await LVDeployerV2.new();
 }
 
 async function makeFactory(opts = {}) {
 	const admin = opts.admin || address(0);
 	const reservesAdmin = opts.reservesAdmin || address(0);
 	const reallocateManager = opts.reallocateManager || address(0);
-	const LVDeployerV1 = await makeLVDeployerV1();
-	const factory = await LendingVaultV1Factory.new(admin, reservesAdmin, LVDeployerV1.address);
+	const LVDeployerV2 = await makeLVDeployerV2();
+	const factory = await LendingVaultV2Factory.new(admin, reservesAdmin, LVDeployerV2.address);
 	return Object.assign(factory, {obj: {admin, reservesAdmin, reallocateManager}});
 }
 
@@ -73,13 +73,13 @@ async function makeLendingVault(opts = {}) {
 	const factory = opts.factory || await makeFactory(opts);
 	const vaultAddress = await factory.createVault.call(token.address, "", "");
 	await factory.createVault(token.address, "", "");
-	const vault = await LendingVaultV1.at(vaultAddress);
+	const vault = await LendingVaultV2.at(vaultAddress);
 	return Object.assign(vault, {obj: {token, factory}});
 }
 
 async function makeLendingVaultHarness(opts = {}) {
 	const token = opts.token || await makeErc20Token();
-	const vault = await LendingVaultV1Harness.new();
+	const vault = await LendingVaultV2Harness.new();
 	await vault._setFactory();
 	await vault._initialize(token.address, "", "");
 	if (opts.factory) await vault._setFactory(opts.factory);
@@ -99,13 +99,13 @@ module.exports = {
 	MockERC20,
 	ImpermaxERC20,
 	Borrowable,
-	LendingVaultV1Factory,
-	LendingVaultV1,
+	LendingVaultV2Factory,
+	LendingVaultV2,
 	
 	makeErc20Token,
 	makeBorrowable,
 	makeBorrowables,
-	makeLVDeployerV1,
+	makeLVDeployerV2,
 	makeFactory,
 	makeLendingVault,
 	makeLendingVaultHarness,

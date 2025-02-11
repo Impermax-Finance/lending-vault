@@ -1,6 +1,6 @@
 pragma solidity =0.5.16;
 
-contract LVStorageV1 {
+contract LVStorageV2 {
 	address[] public borrowables;
 	struct BorrowableInfo {
 		bool enabled;
@@ -16,7 +16,7 @@ contract LVStorageV1 {
 				return i;
 			}
 		}
-		require(false, "LendingVaultV1: BORROWABLE_NOT_FOUND");
+		require(false, "LendingVaultV2: BORROWABLE_NOT_FOUND");
 	}
 
 	uint public exchangeRateLast;

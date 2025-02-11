@@ -1,10 +1,10 @@
 pragma solidity =0.5.16;
 
-import "../LendingVaultV1.sol";
+import "../LendingVaultV2.sol";
 import "../interfaces/IBorrowable.sol";
 import "../libraries/BorrowableHelpers.sol";
 
-contract LendingVaultV1Harness is LendingVaultV1 {
+contract LendingVaultV2Harness is LendingVaultV2 {
 
 	function _setFactory(address newFactory) external {
 		factory = newFactory;

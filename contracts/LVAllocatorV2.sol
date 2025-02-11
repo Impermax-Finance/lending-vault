@@ -1,12 +1,12 @@
 pragma solidity =0.5.16;
 
 import "./PoolToken.sol";
-import "./LVStorageV1.sol";
-import "./interfaces/ILendingVaultV1.sol";
+import "./LVStorageV2.sol";
+import "./interfaces/ILendingVaultV2.sol";
 import "./libraries/BorrowableHelpers.sol";
 import "./libraries/BorrowableObject.sol";
 
-contract LVAllocatorV1 is ILendingVaultV1, PoolToken, LVStorageV1 {
+contract LVAllocatorV2 is ILendingVaultV2, PoolToken, LVStorageV2 {
 	using BorrowableHelpers for address;
 	using BorrowableObject for BorrowableObject.Borrowable;
 	
@@ -65,7 +65,7 @@ contract LVAllocatorV1 is ILendingVaultV1, PoolToken, LVStorageV1 {
 			(borrowablesObj[i], amount) = borrowablesObj[i].deallocateMax();
 			amountToAllocate = amountToAllocate.add(amount);
 		}
-		amountToAllocate = amountToAllocate.sub(withdrawAmount, "LendingVaultV1: INSUFFICIENT_LIQUIDITY");
+		amountToAllocate = amountToAllocate.sub(withdrawAmount, "LendingVaultV2: INSUFFICIENT_LIQUIDITY");
 		if (borrowablesLength == 0) return;
 		
 		// bubblesort borrowablesObj
@@ -132,7 +132,7 @@ contract LVAllocatorV1 is ILendingVaultV1, PoolToken, LVStorageV1 {
 			}
 		}
 		// mint
-		amountToAllocate = underlying.myBalance().sub(withdrawAmount, "LendingVaultV1: NEGATIVE AMOUNT TO ALLOCATE");
+		amountToAllocate = underlying.myBalance().sub(withdrawAmount, "LendingVaultV2: NEGATIVE AMOUNT TO ALLOCATE");
 		for(uint i = 0; i < borrowablesLength; i++) {
 			if (borrowablesObj[i].ownedSupply > borrowablesObj[i].initialOwnedSupply) {
 				uint mintAmount = borrowablesObj[i].ownedSupply.sub(borrowablesObj[i].initialOwnedSupply);

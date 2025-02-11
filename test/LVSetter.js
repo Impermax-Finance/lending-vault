@@ -59,12 +59,12 @@ contract('LVSetter', function (accounts) {
 		it('permissions check', async () => {
 			expect(await vault.obj.factory.admin()).to.eq(admin);
 			await vault._setReserveFactor(RESERVE_FACTOR_TEST, {from: admin});
-			await expectRevert(vault._setReserveFactor(RESERVE_FACTOR_TEST, {from: user}), 'LendingVaultV1: UNAUTHORIZED');
-			await expectRevert(vault.addBorrowable(address(0), {from: user}), 'LendingVaultV1: UNAUTHORIZED');
-			await expectRevert(vault.removeBorrowable(address(0), {from: user}), 'LendingVaultV1: UNAUTHORIZED');
-			await expectRevert(vault.disableBorrowable(address(0), {from: user}), 'LendingVaultV1: UNAUTHORIZED');
-			await expectRevert(vault.enableBorrowable(address(0), {from: user}), 'LendingVaultV1: UNAUTHORIZED');
-			await expectRevert(vault.unwindBorrowable(address(0), {from: user}), 'LendingVaultV1: UNAUTHORIZED');
+			await expectRevert(vault._setReserveFactor(RESERVE_FACTOR_TEST, {from: user}), 'LendingVaultV2: UNAUTHORIZED');
+			await expectRevert(vault.addBorrowable(address(0), {from: user}), 'LendingVaultV2: UNAUTHORIZED');
+			await expectRevert(vault.removeBorrowable(address(0), {from: user}), 'LendingVaultV2: UNAUTHORIZED');
+			await expectRevert(vault.disableBorrowable(address(0), {from: user}), 'LendingVaultV2: UNAUTHORIZED');
+			await expectRevert(vault.enableBorrowable(address(0), {from: user}), 'LendingVaultV2: UNAUTHORIZED');
+			await expectRevert(vault.unwindBorrowable(address(0), {from: user}), 'LendingVaultV2: UNAUTHORIZED');
 		});
 
 		it('set reserve factor', async () => {
@@ -81,7 +81,7 @@ contract('LVSetter', function (accounts) {
 			expectEqual(await vault.reserveFactor(), succeedMin);
 			await vault._setReserveFactor(succeedMax, {from: admin});
 			expectEqual(await vault.reserveFactor(), succeedMax);
-			await expectRevert(vault._setReserveFactor(failMax, {from: admin}), 'LendingVaultV1: INVALID_SETTING');
+			await expectRevert(vault._setReserveFactor(failMax, {from: admin}), 'LendingVaultV2: INVALID_SETTING');
 		});
 
 		it('add borrowable 0', async () => {
@@ -106,14 +106,14 @@ contract('LVSetter', function (accounts) {
 		});
 
 		it('add borrowable reverts', async () => {
-			await expectRevert(vault.addBorrowable(address(0), {from: user}), 'LendingVaultV1: UNAUTHORIZED');
+			await expectRevert(vault.addBorrowable(address(0), {from: user}), 'LendingVaultV2: UNAUTHORIZED');
 			await expectRevert(
 				vault.addBorrowable(borrowableDiffentUnderlying.address, {from: admin}), 
-				'LendingVaultV1: INVALID_UNDERLYING'
+				'LendingVaultV2: INVALID_UNDERLYING'
 			);
 			await expectRevert(
 				vault.addBorrowable(borrowable0.address, {from: admin}), 
-				'LendingVaultV1: BORROWABLE_EXISTS'
+				'LendingVaultV2: BORROWABLE_EXISTS'
 			);
 		});
 
@@ -129,14 +129,14 @@ contract('LVSetter', function (accounts) {
 		});
 
 		it('disable borrowable reverts', async () => {
-			await expectRevert(vault.disableBorrowable(address(0), {from: user}), 'LendingVaultV1: UNAUTHORIZED');
+			await expectRevert(vault.disableBorrowable(address(0), {from: user}), 'LendingVaultV2: UNAUTHORIZED');
 			await expectRevert(
 				vault.disableBorrowable(borrowableDiffentUnderlying.address, {from: admin}), 
-				'LendingVaultV1: BORROWABLE_DOESNT_EXISTS'
+				'LendingVaultV2: BORROWABLE_DOESNT_EXISTS'
 			);
 			await expectRevert(
 				vault.disableBorrowable(borrowable0.address, {from: admin}), 
-				'LendingVaultV1: BORROWABLE_DISABLED'
+				'LendingVaultV2: BORROWABLE_DISABLED'
 			);
 		});
 
@@ -152,26 +152,26 @@ contract('LVSetter', function (accounts) {
 		});
 
 		it('enable borrowable reverts', async () => {
-			await expectRevert(vault.enableBorrowable(address(0), {from: user}), 'LendingVaultV1: UNAUTHORIZED');
+			await expectRevert(vault.enableBorrowable(address(0), {from: user}), 'LendingVaultV2: UNAUTHORIZED');
 			await expectRevert(
 				vault.enableBorrowable(borrowableDiffentUnderlying.address, {from: admin}), 
-				'LendingVaultV1: BORROWABLE_DOESNT_EXISTS'
+				'LendingVaultV2: BORROWABLE_DOESNT_EXISTS'
 			);
 			await expectRevert(
 				vault.enableBorrowable(borrowable1.address, {from: admin}), 
-				'LendingVaultV1: BORROWABLE_ENABLED'
+				'LendingVaultV2: BORROWABLE_ENABLED'
 			);
 		});
 
 		it('remove borrowable reverts', async () => {
-			await expectRevert(vault.removeBorrowable(address(0), {from: user}), 'LendingVaultV1: UNAUTHORIZED');
+			await expectRevert(vault.removeBorrowable(address(0), {from: user}), 'LendingVaultV2: UNAUTHORIZED');
 			await expectRevert(
 				vault.removeBorrowable(borrowableDiffentUnderlying.address, {from: admin}), 
-				'LendingVaultV1: BORROWABLE_DOESNT_EXISTS'
+				'LendingVaultV2: BORROWABLE_DOESNT_EXISTS'
 			);
 			await expectRevert(
 				vault.removeBorrowable(borrowable1.address, {from: admin}), 
-				'LendingVaultV1: BORROWABLE_ENABLED'
+				'LendingVaultV2: BORROWABLE_ENABLED'
 			);
 		});
 
@@ -204,7 +204,7 @@ contract('LVSetter', function (accounts) {
 			await vault.disableBorrowable(borrowable1.address, {from: admin});
 			await expectRevert(
 				vault.removeBorrowable(borrowable1.address, {from: admin}), 
-				'LendingVaultV1: NOT_EMPTY'
+				'LendingVaultV2: NOT_EMPTY'
 			);
 			await vault.enableBorrowable(borrowable1.address, {from: admin});
 		});
@@ -213,21 +213,21 @@ contract('LVSetter', function (accounts) {
 			await vault.disableBorrowable(borrowable1.address, {from: admin});
 			await expectRevert(
 				vault.removeBorrowable(borrowable1.address, {from: admin}), 
-				'LendingVaultV1: NOT_EMPTY'
+				'LendingVaultV2: NOT_EMPTY'
 			);
 			await vault.unwindBorrowable(borrowable1.address, {from: admin});
 			await vault.removeBorrowable(borrowable1.address, {from: admin});
 		});
 
 		it('unwind borrowable reverts', async () => {
-			await expectRevert(vault.unwindBorrowable(address(0), {from: user}), 'LendingVaultV1: UNAUTHORIZED');
+			await expectRevert(vault.unwindBorrowable(address(0), {from: user}), 'LendingVaultV2: UNAUTHORIZED');
 			await expectRevert(
 				vault.unwindBorrowable(borrowable1.address, {from: admin}), 
-				'LendingVaultV1: BORROWABLE_DOESNT_EXISTS'
+				'LendingVaultV2: BORROWABLE_DOESNT_EXISTS'
 			);
 			await expectRevert(
 				vault.unwindBorrowable(borrowable0.address, {from: admin}), 
-				'LendingVaultV1: BORROWABLE_ENABLED'
+				'LendingVaultV2: BORROWABLE_ENABLED'
 			);
 		});
 
@@ -242,7 +242,7 @@ contract('LVSetter', function (accounts) {
 			expectEqual(await borrowable0.balanceOf(vault.address), BN(0));
 			await expectRevert(
 				vault.unwindBorrowable(borrowable0.address, {from: admin}), 
-				'LendingVaultV1: ZERO_AMOUNT'
+				'LendingVaultV2: ZERO_AMOUNT'
 			);
 		});
 
@@ -275,7 +275,7 @@ contract('LVSetter', function (accounts) {
 			await vault.skim(robber);
 			const vaultBalance = await vault.obj.token.balanceOf(vault.address);
 			expectEqual(initialVaultBalance, vaultBalance);
-			await expectRevert(vault.mint(robber), "LendingVaultV1: MINT_AMOUNT_ZERO");
+			await expectRevert(vault.mint(robber), "LendingVaultV2: MINT_AMOUNT_ZERO");
 		});
 	});
 	
